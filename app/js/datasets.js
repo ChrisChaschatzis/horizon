@@ -9,10 +9,18 @@ $(document).ready(function() {
 
         const formData = new FormData(this);
         const btn = $('#btnImport');
-        const status = $('#importStatus');
 
-        btn.prop('disabled', true).text('Importing...');
-        status.text('Uploading and processing... This may take a while.');
+        // Progress UI
+        const progressContainer = $('#progressContainer');
+        const status = $('#importStatus');
+        const percent = $('#uploadPercent');
+        const progressBar = $('#uploadProgress');
+
+        btn.prop('disabled', true).hide();
+        progressContainer.show();
+        status.text('Μεταφόρτωση...');
+        percent.text('0%');
+        progressBar.val(0);
 
         $.ajax({
             url: `${API_BASE}/import.php`,
@@ -20,15 +28,36 @@ $(document).ready(function() {
             data: formData,
             contentType: false,
             processData: false,
+            xhr: function() {
+                const xhr = new window.XMLHttpRequest();
+                xhr.upload.addEventListener("progress", function(evt) {
+                    if (evt.lengthComputable) {
+                        const percentComplete = Math.round((evt.loaded / evt.total) * 100);
+                        progressBar.val(percentComplete);
+                        percent.text(percentComplete + '%');
+                        if (percentComplete === 100) {
+                             status.text('Επεξεργασία αρχείου (αυτό μπορεί να πάρει λίγο χρόνο)...');
+                        }
+                    }
+                }, false);
+                return xhr;
+            },
             success: function(res) {
-                btn.prop('disabled', false).text('Import Dataset');
-                status.text('Import successful! Dataset ID: ' + res.dataset_id);
-                $('#importForm')[0].reset();
-                loadDatasets();
+                btn.prop('disabled', false).show();
+                progressContainer.hide();
+
+                if (res.success) {
+                    alert('Επιτυχής εισαγωγή! Dataset ID: ' + res.dataset_id);
+                    $('#importForm')[0].reset();
+                    loadDatasets();
+                } else {
+                    alert('Σφάλμα: ' + res.error);
+                }
             },
             error: function(xhr) {
-                btn.prop('disabled', false).text('Import Dataset');
-                status.text('Error: ' + (xhr.responseJSON?.error || xhr.statusText));
+                btn.prop('disabled', false).show();
+                progressContainer.hide();
+                alert('Σφάλμα: ' + (xhr.responseJSON?.error || xhr.statusText));
             }
         });
     });
@@ -47,7 +76,15 @@ function loadDatasets() {
                 dom: 'fltip',
                 language: {
                     search: "",
-                    searchPlaceholder: "Search..."
+                    searchPlaceholder: "Αναζήτηση...",
+                    paginate: {
+                        previous: "Προηγ.",
+                        next: "Επόμ."
+                    },
+                    info: "Εμφάνιση _START_ έως _END_ από _TOTAL_ εγγραφές",
+                    infoEmpty: "Εμφάνιση 0 έως 0 από 0 εγγραφές",
+                    infoFiltered: "(φιλτραρισμένο από _MAX_ συνολικά εγγραφές)",
+                    lengthMenu: "Εμφάνιση _MENU_ εγγραφών"
                 },
                 order: [[0, 'desc']] // Sort by ID desc
             });
@@ -56,7 +93,7 @@ function loadDatasets() {
 
         data.forEach(d => {
             const date = new Date(d.created_at).toLocaleString();
-            const deleteBtn = `<button class="btn-icon" onclick="deleteDataset(${d.id})" style="color:var(--danger); border-color:var(--danger);">Delete</button>`;
+            const deleteBtn = `<button class="btn-icon" onclick="deleteDataset(${d.id})" style="color:var(--danger); border-color:var(--danger);">Διαγραφή</button>`;
 
             table.row.add([
                 d.id,
@@ -73,7 +110,7 @@ function loadDatasets() {
 }
 
 function deleteDataset(id) {
-    if (!confirm("Are you sure you want to delete this dataset? This cannot be undone.")) return;
+    if (!confirm("Είστε σίγουροι ότι θέλετε να διαγράψετε αυτό το dataset; Η ενέργεια δεν μπορεί να αναιρεθεί.")) return;
 
     $.ajax({
         url: `${API_BASE}/datasets.php?id=${id}`,
@@ -82,7 +119,7 @@ function deleteDataset(id) {
             loadDatasets();
         },
         error: function(xhr) {
-            alert("Error deleting dataset: " + (xhr.responseJSON?.error || xhr.statusText));
+            alert("Σφάλμα διαγραφής dataset: " + (xhr.responseJSON?.error || xhr.statusText));
         }
     });
 }

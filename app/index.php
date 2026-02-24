@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horizon Europe BI Dashboard</title>
+    <title>Horizon Europe BI Dashboard - Πίνακας Ελέγχου</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="css/style.css">
@@ -25,7 +25,7 @@
                         <rect x="14" y="14" width="7" height="7"></rect>
                         <rect x="3" y="14" width="7" height="7"></rect>
                     </svg>
-                    <span>Dashboard</span>
+                    <span>Πίνακας Ελέγχου</span>
                 </a>
                 <a href="analytics.php" class="nav-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -33,14 +33,14 @@
                         <line x1="12" y1="20" x2="12" y2="4"></line>
                         <line x1="6" y1="20" x2="6" y2="14"></line>
                     </svg>
-                    <span>Analytics</span>
+                    <span>Αναλύσεις</span>
                 </a>
                 <a href="chartbuilder.php" class="nav-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M12 6v6l4 2"></path>
                     </svg>
-                    <span>Chart Builder</span>
+                    <span>Δημιουργία Γραφημάτων</span>
                 </a>
                 <a href="datasets.php" class="nav-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -50,7 +50,7 @@
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                         <polyline points="10 9 9 9 8 9"></polyline>
                     </svg>
-                    <span>Datasets</span>
+                    <span>Δεδομένα</span>
                 </a>
             </nav>
         </aside>
@@ -61,20 +61,20 @@
             <div class="top-bar">
                 <div class="filters-bar">
                     <select id="datasetSelector" class="dataset-selector">
-                        <option value="">Loading datasets...</option>
+                        <option value="">Φόρτωση δεδομένων...</option>
                     </select>
 
                     <button class="filter-btn" id="filterGreekAny" onclick="toggleFilter('only_greek_any_role')">
-                        🇬🇷 Greek Any Role
+                        🇬🇷 Ελληνική Συμμετοχή
                     </button>
                     <button class="filter-btn" id="filterGreekCoord" onclick="toggleFilter('only_greek_coordinator')">
-                        🇬🇷 Greek Coordinator
+                        🇬🇷 Έλληνας Συντονιστής
                     </button>
                     <button class="filter-btn" id="filterNoErrors" onclick="toggleFilter('exclude_error')">
-                        ✅ Valid Projects
+                        ✅ Έγκυρα Έργα
                     </button>
                     <button class="filter-btn" onclick="resetFilters()">
-                        🔄 Reset
+                        🔄 Επαναφορά
                     </button>
                 </div>
                 <div id="lastUpdated" style="color: var(--muted); font-size: 0.9rem;"></div>
@@ -83,25 +83,25 @@
             <!-- KPI Cards -->
             <div class="kpi-grid">
                 <div class="card kpi-card">
-                    <h3>Total Projects</h3>
+                    <h3>Σύνολο Έργων</h3>
                     <div class="kpi-value" id="kpiTotal">0</div>
-                    <div class="kpi-sub">Filtered View</div>
+                    <div class="kpi-sub">Προβολή Φίλτρου</div>
                 </div>
                 <div class="card kpi-card">
-                    <h3>Greek Any Role</h3>
+                    <h3>Ελληνική Συμμετοχή</h3>
                     <div class="kpi-value" id="kpiGreekAny">0</div>
                     <div class="kpi-sub" id="kpiGreekAnyPct">0%</div>
                 </div>
                 <div class="card kpi-card">
-                    <h3>Greek Coordinator</h3>
+                    <h3>Έλληνας Συντονιστής</h3>
                     <div class="kpi-value" id="kpiGreekCoord">0</div>
                     <div class="kpi-sub" id="kpiGreekCoordPct">0%</div>
                 </div>
                  <!-- Data Quality / Completeness could be dynamic -->
                  <div class="card kpi-card">
-                    <h3>Project Status</h3>
+                    <h3>Κατάσταση Έργων</h3>
                     <div class="kpi-value" id="kpiStatus">OK</div>
-                    <div class="kpi-sub">Data Quality</div>
+                    <div class="kpi-sub">Ποιότητα Δεδομένων</div>
                 </div>
             </div>
 
@@ -110,7 +110,7 @@
                 <!-- Coordinator Ranking -->
                 <div class="card chart-card">
                     <div class="chart-header">
-                        <h4 class="chart-title">Top Coordinator Countries</h4>
+                        <h4 class="chart-title">Κορυφαίες Χώρες Συντονιστές</h4>
                         <div class="chart-actions">
                             <button class="btn-icon" onclick="exportChart('chartCoord', 'Coordinator_Ranking')">📷 PNG</button>
                         </div>
@@ -123,7 +123,7 @@
                 <!-- Greek Breakdown -->
                 <div class="card chart-card">
                     <div class="chart-header">
-                        <h4 class="chart-title">Greek Participation Breakdown</h4>
+                        <h4 class="chart-title">Ανάλυση Ελληνικής Συμμετοχής</h4>
                         <div class="chart-actions">
                              <button class="btn-icon" onclick="exportChart('chartGreek', 'Greek_Breakdown')">📷 PNG</button>
                         </div>
@@ -136,7 +136,7 @@
                 <!-- Consortium Ranking -->
                 <div class="card chart-card full-width">
                      <div class="chart-header">
-                        <h4 class="chart-title">Top Consortium Countries (All Roles)</h4>
+                        <h4 class="chart-title">Κορυφαίες Χώρες Κοινοπραξίας (Όλοι οι Ρόλοι)</h4>
                         <div class="chart-actions">
                              <button class="btn-icon" onclick="exportChart('chartConsortium', 'Consortium_Ranking')">📷 PNG</button>
                         </div>

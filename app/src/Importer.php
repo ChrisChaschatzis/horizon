@@ -35,7 +35,7 @@ class Importer {
             $rows = $sheet->toArray();
 
             if (empty($rows)) {
-                throw new Exception("Excel file is empty");
+                throw new Exception("Το αρχείο Excel είναι κενό");
             }
 
             // Map headers
@@ -60,7 +60,7 @@ class Importer {
                  // Try to find it by value? No, header is safer.
                  // Debug:
                  // throw new Exception("Excel missing required column 'project_id' or 'Project number'. Found: " . implode(', ', array_keys($headerMap)));
-                 throw new Exception("Excel missing required column 'project_id' or 'Project number'");
+                 throw new Exception("Λείπει η υποχρεωτική στήλη 'project_id' ή 'Project number' από το Excel");
             }
 
             $projectDataMap = [];
@@ -120,10 +120,10 @@ class Importer {
         $coordName = $row[$map['coordinator_name'] ?? -1] ?? '';
         $coordCountry = $row[$map['coordinator_country'] ?? -1] ?? '';
 
-        $hasGreekPart = $row[$map['has_greek_participant'] ?? -1] ?? 0;
-        $hasGreekBen = $row[$map['has_greek_beneficiary'] ?? -1] ?? 0;
-        $hasGreekAny = $row[$map['has_greek_any_role'] ?? -1] ?? 0;
-        $isGreekCoord = $row[$map['is_greek_coordinator'] ?? -1] ?? 0;
+        $hasGreekPart = $this->parseBoolean($row[$map['has_greek_participant'] ?? -1] ?? 0);
+        $hasGreekBen = $this->parseBoolean($row[$map['has_greek_beneficiary'] ?? -1] ?? 0);
+        $hasGreekAny = $this->parseBoolean($row[$map['has_greek_any_role'] ?? -1] ?? 0);
+        $isGreekCoord = $this->parseBoolean($row[$map['is_greek_coordinator'] ?? -1] ?? 0);
 
         $keywordsText = $row[$map['keywords'] ?? -1] ?? '';
         $fieldsText = $row[$map['fields_of_science'] ?? -1] ?? '';
@@ -253,5 +253,15 @@ class Importer {
     private function insertPriority($datasetId, $projectDbId, $label, $percent) {
         $stmt = $this->pdo->prepare("INSERT INTO invest_priorities (dataset_id, project_db_id, label, percent) VALUES (?, ?, ?, ?)");
         $stmt->execute([$datasetId, $projectDbId, $label, $percent]);
+    }
+
+    private function parseBoolean($value) {
+        if (is_bool($value)) return $value ? 1 : 0;
+        if (is_numeric($value)) return (int)$value ? 1 : 0;
+
+        $s = strtoupper(trim((string)$value));
+        if ($s === 'TRUE' || $s === 'YES' || $s === 'Y') return 1;
+
+        return 0;
     }
 }
