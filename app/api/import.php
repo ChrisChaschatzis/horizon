@@ -13,35 +13,40 @@ try {
 
     // Check method
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        throw new Exception('Method not allowed', 405);
+        throw new Exception('Μη επιτρεπτή μέθοδος (Method not allowed)', 405);
     }
 
     // Check files
-    if (!isset($_FILES['excel_file'])) {
-        throw new Exception('Missing Excel file', 400);
+    $excelFile = null;
+    if (isset($_FILES['excel_file']) && $_FILES['excel_file']['error'] !== UPLOAD_ERR_NO_FILE) {
+        $excelFile = $_FILES['excel_file'];
+    } elseif (isset($_FILES['excel_file_manual']) && $_FILES['excel_file_manual']['error'] !== UPLOAD_ERR_NO_FILE) {
+        $excelFile = $_FILES['excel_file_manual'];
     }
 
-    $excelFile = $_FILES['excel_file'];
+    if (!$excelFile) {
+        throw new Exception('Λείπει το αρχείο Excel (Παρακαλώ επιλέξτε ή σύρετε ένα αρχείο)', 400);
+    }
     $jsonlFile = $_FILES['jsonl_file'] ?? null;
-    $datasetName = $_POST['dataset_name'] ?? 'Untitled Dataset';
+    $datasetName = $_POST['dataset_name'] ?? 'Dataset ' . date('Y-m-d H:i');
     $notes = $_POST['notes'] ?? '';
 
     // Check upload errors
     if ($excelFile['error'] !== UPLOAD_ERR_OK) {
-        throw new Exception('Excel file upload error: ' . $excelFile['error'], 400);
+        throw new Exception('Σφάλμα μεταφόρτωσης αρχείου Excel: ' . $excelFile['error'], 400);
     }
 
     // Move uploaded files
     $uploadDir = __DIR__ . '/../data/uploads/';
     if (!is_dir($uploadDir)) {
         if (!mkdir($uploadDir, 0777, true)) {
-            throw new Exception('Failed to create upload directory', 500);
+            throw new Exception('Αποτυχία δημιουργίας φακέλου μεταφόρτωσης', 500);
         }
     }
 
     $excelPath = $uploadDir . uniqid() . '_' . basename($excelFile['name']);
     if (!move_uploaded_file($excelFile['tmp_name'], $excelPath)) {
-        throw new Exception('Failed to move Excel file', 500);
+        throw new Exception('Αποτυχία μετακίνησης αρχείου Excel', 500);
     }
 
     // JSONL is optional
@@ -49,7 +54,7 @@ try {
     if ($jsonlFile && $jsonlFile['error'] === UPLOAD_ERR_OK && $jsonlFile['size'] > 0) {
         $jsonlPath = $uploadDir . uniqid() . '_' . basename($jsonlFile['name']);
         if (!move_uploaded_file($jsonlFile['tmp_name'], $jsonlPath)) {
-            throw new Exception('Failed to move JSONL file', 500);
+            throw new Exception('Αποτυχία μετακίνησης αρχείου JSONL', 500);
         }
     }
 

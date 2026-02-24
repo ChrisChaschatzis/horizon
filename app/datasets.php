@@ -59,13 +59,20 @@
                     <!-- Drag & Drop Zone -->
                     <div class="form-group">
                         <label class="form-label">Αρχεία Εισαγωγής</label>
+
+                        <!-- Manual Input -->
+                        <div style="margin-bottom: 0.75rem;">
+                            <input type="file" name="excel_file_manual" id="fileInputManual" class="form-control" accept=".xlsx">
+                        </div>
+
+                        <!-- Drop Zone -->
                         <div class="upload-zone" id="dropZone">
-                            <input type="file" name="excel_file" id="fileInput" class="file-input" accept=".xlsx" required>
+                            <input type="file" name="excel_file" id="fileInputDrop" class="file-input" accept=".xlsx">
                             <div class="upload-content">
                                 <i data-lucide="upload-cloud" class="upload-icon"></i>
                                 <div class="upload-text">Σύρετε το αρχείο Excel εδώ ή κάντε κλικ</div>
                                 <div class="upload-sub">Υποστηρίζεται: .xlsx (Υποχρεωτικό)</div>
-                                <div id="fileName" style="margin-top: 0.5rem; color: var(--accent); font-weight: 500;"></div>
+                                <div id="fileNameDrop" style="margin-top: 0.5rem; color: var(--accent); font-weight: 500;"></div>
                             </div>
                         </div>
                     </div>

@@ -185,7 +185,7 @@ class Importer {
             $framework, $pillar, $thematicPriority, $typeOfAction, $status, $signatureDate,
             $euContribution, $netEuContribution, $totalCost,
             $coordName, $coordCountry,
-            $hasGreekPart, $hasGreekBen, $hasGreekAny, $isGreekCoord,
+            (int)$hasGreekPart, (int)$hasGreekBen, (int)$hasGreekAny, (int)$isGreekCoord,
             $keywordsText, $fieldsText, $investJson, $errorText
         ]);
 

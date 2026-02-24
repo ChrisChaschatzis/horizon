@@ -36,7 +36,7 @@ function updateDashboard() {
         } else if (data.projects_no_keywords > 0 || data.projects_no_priorities > 0) {
             $('#kpiStatus').text('Ελλιπή').css('color', colors.warn);
         } else {
-            $('#kpiStatus').text('OK').css('color', colors.success);
+            $('#kpiStatus').text('Καλή').css('color', colors.success);
         }
     });
 
