@@ -59,6 +59,10 @@ try {
     }
 
     // Run Import
+    require_once __DIR__ . '/../src/SchemaFixer.php';
+    // Ensure DB schema is up to date (silently)
+    SchemaFixer::fix($pdo, true);
+
     $importer = new Importer($pdo);
     $result = $importer->import($excelPath, $jsonlPath, $datasetName, $notes);
 
