@@ -1,0 +1,5 @@
+app/vendor/
+vendor/
+*/vendor/
+app/database.sqlite
+*.log
