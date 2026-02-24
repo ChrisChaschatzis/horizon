@@ -27,7 +27,7 @@ function updateDashboard() {
 
     // 2. Coordinator Ranking
     $.get(`${API_BASE}/ranking.php?${query}&type=coordinator&top=10`, function(res) {
-        renderBarChart('chartCoord', res.labels, res.data, 'Coordinator Countries');
+        renderBarChart('chartCoord', res.labels, res.data, 'Χώρες Συντονιστές');
     });
 
     // 3. Greek Breakdown
@@ -37,7 +37,7 @@ function updateDashboard() {
 
     // 4. Consortium Ranking
     $.get(`${API_BASE}/ranking.php?${query}&type=consortium&top=10`, function(res) {
-        renderBarChart('chartConsortium', res.labels, res.data, 'Consortium Countries');
+        renderBarChart('chartConsortium', res.labels, res.data, 'Χώρες Κοινοπραξίας');
     });
 }
 

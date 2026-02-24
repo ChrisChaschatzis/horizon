@@ -16,7 +16,7 @@ function updateDashboard() {
 
 function buildChart() {
     if (!currentDatasetId) {
-        alert("Please select a dataset first.");
+        alert("Παρακαλώ επιλέξτε ένα dataset πρώτα.");
         return;
     }
 
@@ -45,7 +45,7 @@ function buildChart() {
         },
         error: function(xhr) {
             console.error(xhr);
-            alert("Error building chart: " + (xhr.responseJSON?.error || xhr.statusText));
+            alert("Σφάλμα δημιουργίας γραφήματος: " + (xhr.responseJSON?.error || xhr.statusText));
         }
     });
 }
@@ -58,7 +58,7 @@ function renderChart(data, type, xDim, yMetric) {
 
     // Auto title with rudimentary capitalization
     const formatName = (s) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    const title = `${formatName(yMetric)} by ${formatName(xDim)}`;
+    const title = `${formatName(yMetric)} ανά ${formatName(xDim)}`;
     $('#chartTitle').text(title);
 
     // Color logic
@@ -120,25 +120,29 @@ function renderTable(data) {
     // Usually destroy keeps the table element but removes functionality.
 
     // Just reset HTML to be safe
-    $('#customTable').html('<thead><tr><th>Label</th><th>Value</th></tr></thead><tbody></tbody>');
+    $('#customTable').html('<thead><tr><th>Ετικέτα</th><th>Τιμή</th></tr></thead><tbody></tbody>');
 
     const rows = data.labels.map((lbl, i) => [lbl, data.series[i]]);
 
     dataTable = $('#customTable').DataTable({
         data: rows,
         columns: [
-            { title: "Label" },
-            { title: "Value" }
+            { title: "Ετικέτα" },
+            { title: "Τιμή" }
         ],
         pageLength: 10,
         dom: 'fltip',
         language: {
             search: "",
-            searchPlaceholder: "Search...",
+            searchPlaceholder: "Αναζήτηση...",
             paginate: {
-                previous: "Prev",
-                next: "Next"
-            }
+                previous: "Προηγ.",
+                next: "Επόμ."
+            },
+            info: "Εμφάνιση _START_ έως _END_ από _TOTAL_ εγγραφές",
+            infoEmpty: "Εμφάνιση 0 έως 0 από 0 εγγραφές",
+            infoFiltered: "(φιλτραρισμένο από _MAX_ συνολικά εγγραφές)",
+            lengthMenu: "Εμφάνιση _MENU_ εγγραφών"
         }
     });
 }

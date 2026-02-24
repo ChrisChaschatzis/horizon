@@ -33,7 +33,7 @@ function initDatasetSelector(callback) {
         const sel = $('#datasetSelector');
         sel.empty();
         if (data.length === 0) {
-            sel.append('<option value="">No datasets found</option>');
+            sel.append('<option value="">Δεν βρέθηκαν datasets</option>');
             return;
         }
 
@@ -61,7 +61,7 @@ function initDatasetSelector(callback) {
 
 function updateLastUpdated(date) {
     if (date) {
-        $('#lastUpdated').text('Updated: ' + new Date(date).toLocaleString());
+        $('#lastUpdated').text('Ενημερώθηκε: ' + new Date(date).toLocaleString());
     } else {
         $('#lastUpdated').text('');
     }

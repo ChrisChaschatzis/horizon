@@ -17,14 +17,14 @@ function updateAnalytics() {
     $.get(`${API_BASE}/keywords.php?${query}&top=15`, function(data) {
         const labels = data.map(d => d.keyword);
         const values = data.map(d => d.count);
-        renderBarChart('chartKeywords', labels, values, 'Top Keywords', chartKeywords, (c) => chartKeywords = c, true);
+        renderBarChart('chartKeywords', labels, values, 'Κορυφαίες Λέξεις-Κλειδιά', chartKeywords, (c) => chartKeywords = c, true);
     });
 
     // 2. Fields of Science
     $.get(`${API_BASE}/fields_of_science.php?${query}&level=1`, function(data) {
         const labels = data.map(d => d.field);
         const values = data.map(d => d.count);
-        renderBarChart('chartFields', labels, values, 'Fields of Science', chartFields, (c) => chartFields = c, true);
+        renderBarChart('chartFields', labels, values, 'Επιστημονικά Πεδία', chartFields, (c) => chartFields = c, true);
     });
 
     // 3. Investment Priorities
@@ -32,7 +32,7 @@ function updateAnalytics() {
         const labels = data.map(d => d.label);
         // round to 1 decimal
         const values = data.map(d => parseFloat(d.avg_percent).toFixed(1));
-        renderBarChart('chartPriorities', labels, values, 'Avg % Priority', chartPriorities, (c) => chartPriorities = c, false);
+        renderBarChart('chartPriorities', labels, values, 'Μ.Ο. % Προτεραιότητας', chartPriorities, (c) => chartPriorities = c, false);
     });
 }
 
