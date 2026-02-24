@@ -57,6 +57,21 @@ echo -e "${BLUE}>>> Installing PHP dependencies...${NC}"
 cd $PROJECT_DIR
 sudo -u www-data composer install --no-dev --optimize-autoloader
 
+# 6.5. Configure PHP Settings (Upload Limit)
+echo -e "${BLUE}>>> Configuring PHP limits (100M)...${NC}"
+PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+PHP_INI="/etc/php/$PHP_VERSION/fpm/php.ini"
+
+if [ -f "$PHP_INI" ]; then
+    sudo sed -i 's/^upload_max_filesize.*/upload_max_filesize = 100M/' $PHP_INI
+    sudo sed -i 's/^post_max_size.*/post_max_size = 100M/' $PHP_INI
+    sudo sed -i 's/^memory_limit.*/memory_limit = 256M/' $PHP_INI
+    echo -e "${GREEN}>>> PHP FPM settings updated.${NC}"
+    sudo systemctl restart php$PHP_VERSION-fpm
+else
+    echo -e "${RED}>>> php.ini not found at $PHP_INI. Please check PHP installation.${NC}"
+fi
+
 # 7. Database Setup (Interactive Choice)
 echo -e "${BLUE}>>> Database Setup${NC}"
 read -p "Do you want to use MySQL (m) or SQLite (s)? [Default: s]: " DB_CHOICE
