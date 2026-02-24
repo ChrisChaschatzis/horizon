@@ -121,7 +121,7 @@ class Importer {
         $projectNumber = $get(['project_number', 'project_id']);
         $acronym = $get(['project_acronym', 'acronym', 'cordis_acronym']);
         $title = $get(['cordis_title', 'title']);
-        $cordisUrl = $get(['cordis_url', 'cordis_link']);
+        $cordisUrl = $get(['cordis_link', 'cordis_url']);
 
         // --- Metadata ---
         $framework = $get(['framework_programme']);
