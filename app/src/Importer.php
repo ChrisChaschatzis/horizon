@@ -13,16 +13,24 @@ class Importer {
     }
 
     public function import($excelPath, $jsonlPath, $datasetName, $notes = '') {
+        // Increase limits for large imports
+        set_time_limit(0);
+        ini_set('memory_limit', '512M');
+
         $this->pdo->beginTransaction();
 
         try {
             // 1. Create Dataset Record
             $stmt = $this->pdo->prepare("INSERT INTO datasets (name, excel_filename, jsonl_filename, notes) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$datasetName, basename($excelPath), basename($jsonlPath), $notes]);
+            $stmt->execute([$datasetName, basename($excelPath), $jsonlPath ? basename($jsonlPath) : null, $notes]);
             $datasetId = $this->pdo->lastInsertId();
 
             // 2. Parse Excel
-            $spreadsheet = IOFactory::load($excelPath);
+            // Using ReadDataOnly for memory efficiency since we don't need formatting
+            $reader = IOFactory::createReaderForFile($excelPath);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($excelPath);
+
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray();
 
@@ -33,40 +41,56 @@ class Importer {
             // Map headers
             $headers = array_shift($rows);
             // Clean headers (trim)
-            $headers = array_map('trim', $headers);
+            $headers = array_map(function($h) { return trim((string)$h); }, $headers);
             $headerMap = array_flip($headers);
 
-            // Check for required column project_id
-            if (!isset($headerMap['project_id'])) {
-                throw new Exception("Excel missing required column 'project_id'");
+            // Map headers - Handle variations
+            $map = [];
+            foreach ($headerMap as $h => $idx) {
+                $cleanH = strtolower(trim($h));
+                $map[$cleanH] = $idx;
+                // Also map snake_case versions
+                $map[str_replace(' ', '_', $cleanH)] = $idx;
+            }
+
+            // Check for required column project_id (or variations)
+            $pidIndex = $map['project_id'] ?? $map['project_number'] ?? $map['projectnumber'] ?? null;
+
+            if ($pidIndex === null) {
+                 // Try to find it by value? No, header is safer.
+                 // Debug:
+                 // throw new Exception("Excel missing required column 'project_id' or 'Project number'. Found: " . implode(', ', array_keys($headerMap)));
+                 throw new Exception("Excel missing required column 'project_id' or 'Project number'");
             }
 
             $projectDataMap = [];
 
             foreach ($rows as $row) {
-                $pid = $row[$headerMap['project_id']] ?? null;
+                $pid = $row[$pidIndex] ?? null;
                 if (!$pid) continue;
                 $projectDataMap[(string)$pid] = [
                     'row' => $row,
-                    'map' => $headerMap
+                    'map' => $map
                 ];
             }
 
-            // 3. Parse JSONL
-            $jsonlHandle = fopen($jsonlPath, 'r');
-            if ($jsonlHandle) {
-                while (($line = fgets($jsonlHandle)) !== false) {
-                    $jsonObj = json_decode($line, true);
-                    if (!$jsonObj || !isset($jsonObj['project_id'])) continue;
+            // 3. Parse JSONL (if provided)
+            if ($jsonlPath && file_exists($jsonlPath)) {
+                $jsonlHandle = fopen($jsonlPath, 'r');
+                if ($jsonlHandle) {
+                    while (($line = fgets($jsonlHandle)) !== false) {
+                        $jsonObj = json_decode($line, true);
+                        if (!$jsonObj || !isset($jsonObj['project_id'])) continue;
 
-                    $pid = (string)$jsonObj['project_id'];
+                        $pid = (string)$jsonObj['project_id'];
 
-                    if (isset($projectDataMap[$pid])) {
-                        $this->insertProject($datasetId, $projectDataMap[$pid], $jsonObj);
-                        unset($projectDataMap[$pid]);
+                        if (isset($projectDataMap[$pid])) {
+                            $this->insertProject($datasetId, $projectDataMap[$pid], $jsonObj);
+                            unset($projectDataMap[$pid]);
+                        }
                     }
+                    fclose($jsonlHandle);
                 }
-                fclose($jsonlHandle);
             }
 
             // Insert remaining projects
@@ -89,10 +113,10 @@ class Importer {
         $row = $excelData['row'];
         $map = $excelData['map'];
 
-        $projectId = $row[$map['project_id']];
-        $cordisUrl = $row[$map['cordis_url'] ?? -1] ?? '';
-        $title = $row[$map['cordis_title'] ?? -1] ?? '';
-        $acronym = $row[$map['cordis_acronym'] ?? -1] ?? '';
+        $projectId = $row[$map['project_id'] ?? $map['project_number'] ?? $map['projectnumber']];
+        $cordisUrl = $row[$map['cordis_url'] ?? $map['cordis_link'] ?? $map['cordislink'] ?? -1] ?? '';
+        $title = $row[$map['cordis_title'] ?? $map['title'] ?? -1] ?? '';
+        $acronym = $row[$map['cordis_acronym'] ?? $map['project_acronym'] ?? $map['acronym'] ?? -1] ?? '';
         $coordName = $row[$map['coordinator_name'] ?? -1] ?? '';
         $coordCountry = $row[$map['coordinator_country'] ?? -1] ?? '';
 
@@ -104,6 +128,15 @@ class Importer {
         $keywordsText = $row[$map['keywords'] ?? -1] ?? '';
         $fieldsText = $row[$map['fields_of_science'] ?? -1] ?? '';
         $investJson = $row[$map['invest_priorities_json'] ?? -1] ?? '{}';
+
+        // Handle explicit column names from user if they differ
+        // "Project Net EU Contribution (EUR)" might be eu_contribution
+        $euContribution = $row[$map['eu_contribution'] ?? $map['project_eu_contribution_(eur)'] ?? $map['project_net_eu_contribution_(eur)'] ?? -1] ?? null;
+        $totalCost = $row[$map['total_cost'] ?? $map['project_total_cost_(eur)'] ?? -1] ?? null;
+        $status = $row[$map['status'] ?? $map['project_status'] ?? -1] ?? null;
+        $signatureDate = $row[$map['signature_date'] ?? -1] ?? null;
+        $pillar = $row[$map['pillar'] ?? -1] ?? null;
+        $typeOfAction = $row[$map['type_of_action'] ?? -1] ?? null;
 
         // Enrichment
         if ($jsonData) {
@@ -126,15 +159,17 @@ class Importer {
                 dataset_id, project_id, cordis_url, title, acronym,
                 coordinator_name, coordinator_country,
                 has_greek_participant, has_greek_beneficiary, has_greek_any_role, is_greek_coordinator,
-                keywords_text, fields_text, invest_priorities_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                keywords_text, fields_text, invest_priorities_json,
+                eu_contribution, total_cost, status, signature_date, pillar, type_of_action
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $stmt->execute([
             $datasetId, $projectId, $cordisUrl, $title, $acronym,
             $coordName, $coordCountry,
             $hasGreekPart, $hasGreekBen, $hasGreekAny, $isGreekCoord,
-            $keywordsText, $fieldsText, $investJson
+            $keywordsText, $fieldsText, $investJson,
+            $euContribution, $totalCost, $status, $signatureDate, $pillar, $typeOfAction
         ]);
 
         $projectDbId = $this->pdo->lastInsertId();

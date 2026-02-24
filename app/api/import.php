@@ -17,21 +17,18 @@ try {
     }
 
     // Check files
-    if (!isset($_FILES['excel_file']) || !isset($_FILES['jsonl_file'])) {
-        throw new Exception('Missing files', 400);
+    if (!isset($_FILES['excel_file'])) {
+        throw new Exception('Missing Excel file', 400);
     }
 
     $excelFile = $_FILES['excel_file'];
-    $jsonlFile = $_FILES['jsonl_file'];
+    $jsonlFile = $_FILES['jsonl_file'] ?? null;
     $datasetName = $_POST['dataset_name'] ?? 'Untitled Dataset';
     $notes = $_POST['notes'] ?? '';
 
     // Check upload errors
     if ($excelFile['error'] !== UPLOAD_ERR_OK) {
         throw new Exception('Excel file upload error: ' . $excelFile['error'], 400);
-    }
-    if ($jsonlFile['error'] !== UPLOAD_ERR_OK) {
-        throw new Exception('JSONL file upload error: ' . $jsonlFile['error'], 400);
     }
 
     // Move uploaded files
@@ -43,13 +40,17 @@ try {
     }
 
     $excelPath = $uploadDir . uniqid() . '_' . basename($excelFile['name']);
-    $jsonlPath = $uploadDir . uniqid() . '_' . basename($jsonlFile['name']);
-
     if (!move_uploaded_file($excelFile['tmp_name'], $excelPath)) {
         throw new Exception('Failed to move Excel file', 500);
     }
-    if (!move_uploaded_file($jsonlFile['tmp_name'], $jsonlPath)) {
-        throw new Exception('Failed to move JSONL file', 500);
+
+    // JSONL is optional
+    $jsonlPath = null;
+    if ($jsonlFile && $jsonlFile['error'] === UPLOAD_ERR_OK && $jsonlFile['size'] > 0) {
+        $jsonlPath = $uploadDir . uniqid() . '_' . basename($jsonlFile['name']);
+        if (!move_uploaded_file($jsonlFile['tmp_name'], $jsonlPath)) {
+            throw new Exception('Failed to move JSONL file', 500);
+        }
     }
 
     // Run Import
