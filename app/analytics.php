@@ -11,27 +11,29 @@
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="layout">
-        <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="logo">CORDIS BI</div>
+            <div class="logo">
+                <i data-lucide="bar-chart-2"></i> CORDIS BI
+            </div>
             <nav>
                 <a href="index.php" class="nav-link">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <i data-lucide="layout-dashboard"></i>
                     <span>Σύνοψη</span>
                 </a>
                 <a href="analytics.php" class="nav-link active">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <i data-lucide="pie-chart"></i>
                     <span>Αναλύσεις</span>
                 </a>
                 <a href="chartbuilder.php" class="nav-link">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                    <i data-lucide="line-chart"></i>
                     <span>Δημιουργία Γραφημάτων</span>
                 </a>
                 <a href="datasets.php" class="nav-link">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <i data-lucide="database"></i>
                     <span>Διαχείριση Δεδομένων</span>
                 </a>
             </nav>
@@ -39,7 +41,7 @@
 
         <main class="main-content">
             <div class="top-bar">
-                <button class="mobile-menu-btn" style="margin-right: 1rem;">☰</button>
+                <button class="mobile-menu-btn"><i data-lucide="menu"></i></button>
                 <div class="filters-bar">
                     <select id="datasetSelector" class="dataset-selector">
                         <option value="">Φόρτωση...</option>
@@ -52,10 +54,10 @@
                         🇬🇷 Έλληνας Συντονιστής
                     </button>
                     <button class="filter-btn" onclick="resetFilters()">
-                        🔄 Καθαρισμός Φίλτρων
+                        <i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i> Καθαρισμός
                     </button>
                 </div>
-                <div id="lastUpdated" style="color: var(--muted); font-size: 0.85rem; font-weight: 500;"></div>
+                <div id="lastUpdated" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;"></div>
             </div>
 
             <div class="charts-grid">
@@ -64,7 +66,9 @@
                     <div class="chart-header">
                         <h4 class="chart-title">Δημοφιλέστερες Λέξεις-Κλειδιά</h4>
                         <div class="chart-actions">
-                             <button class="btn-icon" onclick="exportChart('chartKeywords', 'Top_Keywords')">📷 Εξαγωγή σε PNG</button>
+                             <button class="btn-icon" onclick="exportChart('chartKeywords', 'Top_Keywords')">
+                                <i data-lucide="camera"></i>
+                             </button>
                         </div>
                     </div>
                     <div class="chart-container">
@@ -77,7 +81,9 @@
                     <div class="chart-header">
                         <h4 class="chart-title">Επιστημονικά Πεδία</h4>
                          <div class="chart-actions">
-                             <button class="btn-icon" onclick="exportChart('chartFields', 'Fields_Science')">📷 Εξαγωγή σε PNG</button>
+                             <button class="btn-icon" onclick="exportChart('chartFields', 'Fields_Science')">
+                                <i data-lucide="camera"></i>
+                             </button>
                         </div>
                     </div>
                     <div class="chart-container">
@@ -90,7 +96,9 @@
                     <div class="chart-header">
                         <h4 class="chart-title">Επενδυτικές Προτεραιότητες Ε.Ε.</h4>
                          <div class="chart-actions">
-                             <button class="btn-icon" onclick="exportChart('chartPriorities', 'Invest_Priorities')">📷 Εξαγωγή σε PNG</button>
+                             <button class="btn-icon" onclick="exportChart('chartPriorities', 'Invest_Priorities')">
+                                <i data-lucide="camera"></i>
+                             </button>
                         </div>
                     </div>
                     <div class="chart-container">
@@ -103,5 +111,8 @@
     </div>
     <script src="js/main.js"></script>
     <script src="js/analytics.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>

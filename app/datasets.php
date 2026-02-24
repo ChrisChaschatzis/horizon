@@ -10,26 +10,30 @@
 
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="layout">
         <aside class="sidebar">
-            <div class="logo">CORDIS BI</div>
+            <div class="logo">
+                <i data-lucide="bar-chart-2"></i> CORDIS BI
+            </div>
             <nav>
                 <a href="index.php" class="nav-link">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <i data-lucide="layout-dashboard"></i>
                     <span>Σύνοψη</span>
                 </a>
                 <a href="analytics.php" class="nav-link">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <i data-lucide="pie-chart"></i>
                     <span>Αναλύσεις</span>
                 </a>
                 <a href="chartbuilder.php" class="nav-link">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                    <i data-lucide="line-chart"></i>
                     <span>Δημιουργία Γραφημάτων</span>
                 </a>
                 <a href="datasets.php" class="nav-link active">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <i data-lucide="database"></i>
                     <span>Διαχείριση Δεδομένων</span>
                 </a>
             </nav>
@@ -37,7 +41,7 @@
 
         <main class="main-content">
              <div class="top-bar">
-                <button class="mobile-menu-btn" style="margin-right: 1rem;">☰</button>
+                <button class="mobile-menu-btn"><i data-lucide="menu"></i></button>
                 <div style="flex:1;">
                     <h3 style="margin:0; font-size: 1.25rem;">Διαχείριση Δεδομένων</h3>
                 </div>
@@ -52,15 +56,24 @@
                         <input type="text" name="dataset_name" class="form-control" required placeholder="π.χ. CORDIS 2026-02">
                     </div>
 
-                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                        <div class="form-group" style="flex: 1;">
-                            <label class="form-label">Αρχείο Excel (.xlsx) - Υποχρεωτικό</label>
-                            <input type="file" name="excel_file" class="form-control" accept=".xlsx" required>
+                    <!-- Drag & Drop Zone -->
+                    <div class="form-group">
+                        <label class="form-label">Αρχεία Εισαγωγής</label>
+                        <div class="upload-zone" id="dropZone">
+                            <input type="file" name="excel_file" id="fileInput" class="file-input" accept=".xlsx" required>
+                            <div class="upload-content">
+                                <i data-lucide="upload-cloud" class="upload-icon"></i>
+                                <div class="upload-text">Σύρετε το αρχείο Excel εδώ ή κάντε κλικ</div>
+                                <div class="upload-sub">Υποστηρίζεται: .xlsx (Υποχρεωτικό)</div>
+                                <div id="fileName" style="margin-top: 0.5rem; color: var(--accent); font-weight: 500;"></div>
+                            </div>
                         </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label class="form-label">Αρχείο JSONL (.jsonl) - Προαιρετικό</label>
-                            <input type="file" name="jsonl_file" class="form-control" accept=".jsonl">
-                        </div>
+                    </div>
+
+                    <!-- JSONL Optional -->
+                    <div class="form-group">
+                        <label class="form-label">Αρχείο JSONL (Προαιρετικό - για εμπλουτισμό)</label>
+                        <input type="file" name="jsonl_file" class="form-control" accept=".jsonl">
                     </div>
 
                     <div class="form-group">
@@ -68,14 +81,19 @@
                         <textarea name="notes" class="form-control" rows="2"></textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" id="btnImport">Εισαγωγή Dataset</button>
+                    <button type="submit" class="btn btn-primary" id="btnImport">
+                        <i data-lucide="save"></i> Εισαγωγή Dataset
+                    </button>
 
-                    <div id="progressContainer" style="margin-top: 1.5rem; display: none;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <span id="importStatus" style="color: var(--muted); font-size: 0.9rem;">Εκκίνηση μεταφόρτωσης...</span>
-                            <span id="uploadPercent" style="color: var(--accent); font-weight: 600;">0%</span>
+                    <!-- Progress Bar -->
+                    <div id="progressWrapper" style="display: none;">
+                        <div class="progress-status">
+                            <span id="importStatus">Μεταφόρτωση...</span>
+                            <span id="uploadPercent">0%</span>
                         </div>
-                        <progress id="uploadProgress" value="0" max="100" style="width: 100%; height: 8px; border-radius: 4px; accent-color: var(--accent);"></progress>
+                        <div class="progress-container">
+                            <div id="uploadProgress" class="progress-bar"></div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -101,5 +119,8 @@
     </div>
     <script src="js/main.js"></script>
     <script src="js/datasets.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>
