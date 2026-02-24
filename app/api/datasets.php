@@ -20,7 +20,7 @@ if ($method === 'GET') {
 
     if (!$id) {
         http_response_code(400);
-        echo json_encode(['error' => 'Missing id']);
+        echo json_encode(['error' => 'Λείπει το ID']);
         exit;
     }
 
@@ -31,7 +31,7 @@ if ($method === 'GET') {
 
     if (!$dataset) {
         http_response_code(404);
-        echo json_encode(['error' => 'Dataset not found']);
+        echo json_encode(['error' => 'Το Dataset δεν βρέθηκε']);
         exit;
     }
 
@@ -43,5 +43,5 @@ if ($method === 'GET') {
 
 } else {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['error' => 'Μη επιτρεπτή μέθοδος']);
 }

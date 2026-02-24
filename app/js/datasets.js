@@ -8,6 +8,15 @@ $(document).ready(function() {
     $('#importForm').on('submit', function(e) {
         e.preventDefault();
 
+        // Validate file selection
+        const manualFile = $('#fileInputManual')[0].files[0];
+        const dropFile = $('#fileInputDrop')[0].files[0];
+
+        if (!manualFile && !dropFile) {
+            alert('Παρακαλώ επιλέξτε ένα αρχείο Excel.');
+            return;
+        }
+
         const formData = new FormData(this);
         const btn = $('#btnImport');
 
@@ -19,9 +28,10 @@ $(document).ready(function() {
 
         btn.prop('disabled', true).addClass('disabled');
         wrapper.show();
-        status.text('Μεταφόρτωσης...');
+        status.text('Μεταφόρτωση...');
         percent.text('0%');
         progressBar.css('width', '0%');
+        progressBar.css('background', 'linear-gradient(90deg, var(--accent), var(--accent2))');
 
         $.ajax({
             url: `${API_BASE}/import.php`,
@@ -53,7 +63,8 @@ $(document).ready(function() {
 
                     alert('Επιτυχής εισαγωγή! Dataset ID: ' + res.dataset_id);
                     $('#importForm')[0].reset();
-                    $('#fileName').text('');
+                    $('#fileNameDrop').text('');
+                    $('#dropZone').css('border-color', '');
                     loadDatasets();
                 } else {
                     status.text('Σφάλμα');
@@ -73,8 +84,8 @@ $(document).ready(function() {
 
 function setupDragAndDrop() {
     const dropZone = $('#dropZone');
-    const fileInput = $('#fileInput');
-    const fileName = $('#fileName');
+    const fileInputDrop = $('#fileInputDrop');
+    const fileNameDrop = $('#fileNameDrop');
 
     // Drag events
     dropZone.on('dragover', function(e) {
@@ -87,16 +98,19 @@ function setupDragAndDrop() {
         $(this).removeClass('dragover');
     });
 
-    // File selection
-    fileInput.on('change', function() {
+    // File selection from Drop Zone Input
+    fileInputDrop.on('change', function() {
         if (this.files.length > 0) {
-            fileName.text(this.files[0].name);
+            fileNameDrop.text(this.files[0].name);
             dropZone.css('border-color', 'var(--accent)');
         } else {
-            fileName.text('');
+            fileNameDrop.text('');
             dropZone.css('border-color', '');
         }
     });
+
+    // Make clicking the zone trigger the input (if not triggered by label/structure automatically)
+    // The CSS .file-input covers the zone, so clicking works automatically.
 }
 
 function loadDatasets() {
