@@ -27,18 +27,20 @@ const colors = {
 };
 
 // Chart.js defaults
-Chart.defaults.color = colors.muted;
-Chart.defaults.borderColor = colors.grid;
-Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
-Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.9)';
-Chart.defaults.plugins.tooltip.borderColor = 'rgba(255, 255, 255, 0.1)';
-Chart.defaults.plugins.tooltip.borderWidth = 1;
-Chart.defaults.plugins.tooltip.padding = 10;
-Chart.defaults.plugins.tooltip.titleColor = colors.text;
-Chart.defaults.plugins.tooltip.bodyColor = colors.muted;
+if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = colors.muted;
+    Chart.defaults.borderColor = colors.grid;
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.9)';
+    Chart.defaults.plugins.tooltip.borderColor = 'rgba(255, 255, 255, 0.1)';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.titleColor = colors.text;
+    Chart.defaults.plugins.tooltip.bodyColor = colors.muted;
+}
 
 // DataTables Greek Language
-const datatableGreek = {
+window.datatableGreek = {
     "search": "Αναζήτηση:",
     "lengthMenu": "Εμφάνιση _MENU_ εγγραφών",
     "info": "Εμφάνιση _START_ έως _END_ από _TOTAL_ εγγραφές",
