@@ -1,0 +1,158 @@
+#!/bin/bash
+
+# setup.sh - Auto-installation script for Horizon Europe BI Dashboard
+# Tested on Ubuntu 22.04 LTS / Debian 12
+
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}>>> Starting Installation for Horizon Europe BI Dashboard...${NC}"
+
+# 1. Update System
+echo -e "${BLUE}>>> Updating package lists...${NC}"
+sudo apt-get update
+
+# 2. Install Dependencies
+echo -e "${BLUE}>>> Installing Nginx, PHP 8.1+, MySQL, and extensions...${NC}"
+sudo apt-get install -y nginx php-fpm php-mysql php-sqlite3 php-xml php-gd php-mbstring php-curl php-zip unzip mysql-server git curl
+
+# 3. Install Composer
+if ! command -v composer &> /dev/null
+then
+    echo -e "${BLUE}>>> Installing Composer...${NC}"
+    curl -sS https://getcomposer.org/installer | php
+    sudo mv composer.phar /usr/local/bin/composer
+else
+    echo -e "${GREEN}>>> Composer already installed.${NC}"
+fi
+
+# 4. Configure Project Directory
+PROJECT_DIR="/var/www/cordis-bi"
+echo -e "${BLUE}>>> Setting up project in ${PROJECT_DIR}...${NC}"
+
+# If app/ exists in current dir, copy it. Otherwise clone or create.
+# Assuming this script is run from the repo root
+if [ -d "app" ]; then
+    sudo mkdir -p $PROJECT_DIR
+    sudo cp -r app/* $PROJECT_DIR/
+    sudo cp -r app/.gitignore $PROJECT_DIR/ 2>/dev/null || true
+else
+    echo -e "${RED}>>> 'app' directory not found. Please run this script from the repository root.${NC}"
+    exit 1
+fi
+
+# 5. Set Permissions
+echo -e "${BLUE}>>> Setting permissions...${NC}"
+sudo chown -R www-data:www-data $PROJECT_DIR
+sudo chmod -R 775 $PROJECT_DIR/data
+sudo chmod -R 775 $PROJECT_DIR/database.sqlite 2>/dev/null || true
+
+# 6. Install PHP Dependencies
+echo -e "${BLUE}>>> Installing PHP dependencies...${NC}"
+cd $PROJECT_DIR
+sudo -u www-data composer install --no-dev --optimize-autoloader
+
+# 7. Database Setup (Interactive Choice)
+echo -e "${BLUE}>>> Database Setup${NC}"
+read -p "Do you want to use MySQL (m) or SQLite (s)? [Default: s]: " DB_CHOICE
+DB_CHOICE=${DB_CHOICE:-s}
+
+if [[ "$DB_CHOICE" == "m" ]]; then
+    echo -e "${BLUE}>>> Configuring MySQL...${NC}"
+    read -p "Enter MySQL Database Name [cordis_bi]: " DB_NAME
+    DB_NAME=${DB_NAME:-cordis_bi}
+    read -p "Enter MySQL User [cordis_user]: " DB_USER
+    DB_USER=${DB_USER:-cordis_user}
+    read -s -p "Enter MySQL Password: " DB_PASS
+    echo ""
+
+    # Create DB and User
+    sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
+    sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+    sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
+    sudo mysql -e "FLUSH PRIVILEGES;"
+
+    # Update config.php
+    cat > config.php <<EOF
+<?php
+define('DB_DRIVER', 'mysql');
+define('DB_HOST', 'localhost');
+define('DB_NAME', '${DB_NAME}');
+define('DB_USER', '${DB_USER}');
+define('DB_PASS', '${DB_PASS}');
+define('DB_PATH', '');
+define('APP_NAME', 'Horizon Europe / CORDIS Mini BI Dashboard');
+date_default_timezone_set('Europe/Athens');
+EOF
+    echo -e "${GREEN}>>> MySQL configured.${NC}"
+else
+    echo -e "${BLUE}>>> Using SQLite (Default)...${NC}"
+    # Ensure SQLite file exists and permissions
+    touch database.sqlite
+    sudo chown www-data:www-data database.sqlite
+    echo -e "${GREEN}>>> SQLite configured.${NC}"
+fi
+
+# 8. Initialize Database Tables
+echo -e "${BLUE}>>> Initializing Database Schema...${NC}"
+sudo -u www-data php init_db.php
+
+# 9. Configure Nginx
+echo -e "${BLUE}>>> Configuring Nginx...${NC}"
+NGINX_CONF="/etc/nginx/sites-available/cordis-bi"
+sudo tee $NGINX_CONF > /dev/null <<EOF
+server {
+    listen 80;
+    server_name _; # Change to your domain
+    root $PROJECT_DIR;
+    index index.php index.html;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')-fpm.sock;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+    # Protect sensitive files
+    location ~ \.(sqlite|sql|log)$ {
+        deny all;
+    }
+
+    location /vendor {
+        deny all;
+    }
+
+    client_max_body_size 100M;
+}
+EOF
+
+# Enable Site
+if [ -f "/etc/nginx/sites-enabled/default" ]; then
+    sudo rm /etc/nginx/sites-enabled/default
+fi
+sudo ln -sf $NGINX_CONF /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+
+# 10. Generate Mock Data (Optional)
+read -p "Do you want to generate mock data? (y/n) [y]: " GEN_MOCK
+GEN_MOCK=${GEN_MOCK:-y}
+if [[ "$GEN_MOCK" == "y" ]]; then
+    sudo -u www-data php generate_mock_data.php
+    echo -e "${GREEN}>>> Mock data generated in data/.${NC}"
+fi
+
+echo -e "${GREEN}>>> Installation Complete!${NC}"
+echo -e "${GREEN}>>> Access the dashboard at http://<your-server-ip>/${NC}"
