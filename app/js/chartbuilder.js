@@ -3,6 +3,25 @@
 let customChart = null;
 let dataTable = null;
 
+const dict = {
+    // Dimensions
+    'coordinator_country': 'Χώρα Συντονιστή',
+    'consortium_country': 'Χώρα Κοινοπραξίας',
+    'fields_of_science': 'Επιστημονικό Πεδίο',
+    'keyword': 'Λέξη-Κλειδί',
+    'invest_priority': 'Επενδυτική Προτεραιότητα',
+    'pillar': 'Πρόγραμμα / Pillar',
+    'type_of_action': 'Τύπος Δράσης',
+    'year': 'Έτος',
+    'has_greek_any_role': 'Ελληνικός Ρόλος',
+    'is_greek_coordinator': 'Έλληνας Συντονιστής',
+
+    // Metrics
+    'count': 'Πλήθος Έργων',
+    'sum_eu_contribution': 'Σύνολο Συνεισφοράς ΕΕ (€)',
+    'average_invest_priority': 'Μ.Ο. % Προτεραιότητας'
+};
+
 $(document).ready(function() {
     initDatasetSelector();
 });
@@ -56,9 +75,10 @@ function renderChart(data, type, xDim, yMetric) {
 
     if (customChart) customChart.destroy();
 
-    // Auto title with rudimentary capitalization
-    const formatName = (s) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    const title = `${formatName(yMetric)} ανά ${formatName(xDim)}`;
+    const xLabel = dict[xDim] || xDim;
+    const yLabel = dict[yMetric] || yMetric;
+    const title = `${yLabel} ανά ${xLabel}`;
+
     $('#chartTitle').text(title);
 
     // Color logic
@@ -66,7 +86,6 @@ function renderChart(data, type, xDim, yMetric) {
     if (type === 'pie' || type === 'doughnut' || type === 'radar') {
         bgColors = colors.palette;
     } else {
-        // Bar chart usually one color unless we want rainbow
         bgColors = colors.accent;
     }
 
@@ -75,12 +94,12 @@ function renderChart(data, type, xDim, yMetric) {
         data: {
             labels: data.labels,
             datasets: [{
-                label: formatName(yMetric),
+                label: yLabel,
                 data: data.series,
                 backgroundColor: bgColors,
                 borderColor: (type === 'line' || type === 'radar') ? colors.accent : colors.bg1,
                 borderWidth: 2,
-                fill: (type === 'radar' || type === 'line' && false), // line fill false usually
+                fill: (type === 'radar' || type === 'line' && false),
                 tension: 0.3
             }]
         },
@@ -95,8 +114,15 @@ function renderChart(data, type, xDim, yMetric) {
                 }
             },
             scales: (type === 'pie' || type === 'doughnut' || type === 'radar') ? {} : {
-                y: { beginAtZero: true, grid: { color: colors.glass2, borderColor: colors.stroke } },
-                x: { grid: { display: false } }
+                y: {
+                    beginAtZero: true,
+                    grid: { color: colors.glass2, borderColor: colors.muted },
+                    title: { display: true, text: yLabel, color: colors.muted }
+                },
+                x: {
+                    grid: { display: false },
+                    title: { display: true, text: xLabel, color: colors.muted }
+                }
             }
         }
     };
@@ -112,14 +138,6 @@ function renderTable(data) {
         $('#customTable').empty();
     }
 
-    // Rebuild header because DataTable destroys it
-    // Actually best to just clear data and add rows if columns same
-    // But columns are always Label, Value.
-
-    // Wait, if I destroy, I need to recreate HTML structure or let DataTable handle it?
-    // Usually destroy keeps the table element but removes functionality.
-
-    // Just reset HTML to be safe
     $('#customTable').html('<thead><tr><th>Ετικέτα</th><th>Τιμή</th></tr></thead><tbody></tbody>');
 
     const rows = data.labels.map((lbl, i) => [lbl, data.series[i]]);
@@ -132,17 +150,6 @@ function renderTable(data) {
         ],
         pageLength: 10,
         dom: 'fltip',
-        language: {
-            search: "",
-            searchPlaceholder: "Αναζήτηση...",
-            paginate: {
-                previous: "Προηγ.",
-                next: "Επόμ."
-            },
-            info: "Εμφάνιση _START_ έως _END_ από _TOTAL_ εγγραφές",
-            infoEmpty: "Εμφάνιση 0 έως 0 από 0 εγγραφές",
-            infoFiltered: "(φιλτραρισμένο από _MAX_ συνολικά εγγραφές)",
-            lengthMenu: "Εμφάνιση _MENU_ εγγραφών"
-        }
+        language: datatableGreek
     });
 }

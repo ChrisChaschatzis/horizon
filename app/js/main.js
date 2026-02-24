@@ -8,25 +8,67 @@ let activeFilters = {
     exclude_error: false
 };
 
-// Colors
+// Colors matching CSS
 const colors = {
-    bg1: '#0B1220',
-    text: '#EAF0FF',
-    accent: '#5EEAD4',
-    accent2: '#60A5FA',
-    warn: '#FBBF24',
-    muted: 'rgba(234, 240, 255, 0.7)',
-    glass2: 'rgba(255, 255, 255, 0.12)',
+    bg1: '#0f172a',
+    bg2: '#1e293b',
+    text: '#f8fafc',
+    muted: '#94a3b8',
+    accent: '#38bdf8',
+    accent2: '#818cf8',
+    warn: '#fbbf24',
+    danger: '#f87171',
+    success: '#4ade80',
+    grid: 'rgba(255, 255, 255, 0.1)',
     palette: [
-        '#5EEAD4', '#60A5FA', '#FBBF24', '#FB7185', '#A78BFA',
-        '#34D399', '#818CF8', '#F472B6', '#FCD34D', '#2DD4BF'
+        '#38bdf8', '#818cf8', '#fbbf24', '#f87171', '#a78bfa',
+        '#34d399', '#f472b6', '#fcd34d', '#2dd4bf', '#60a5fa'
     ]
 };
 
 // Chart.js defaults
 Chart.defaults.color = colors.muted;
-Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+Chart.defaults.borderColor = colors.grid;
 Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.9)';
+Chart.defaults.plugins.tooltip.borderColor = 'rgba(255, 255, 255, 0.1)';
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.titleColor = colors.text;
+Chart.defaults.plugins.tooltip.bodyColor = colors.muted;
+
+// DataTables Greek Language
+const datatableGreek = {
+    "search": "Αναζήτηση:",
+    "lengthMenu": "Εμφάνιση _MENU_ εγγραφών",
+    "info": "Εμφάνιση _START_ έως _END_ από _TOTAL_ εγγραφές",
+    "infoEmpty": "Εμφάνιση 0 έως 0 από 0 εγγραφές",
+    "infoFiltered": "(φιλτραρισμένο από _MAX_ συνολικά εγγραφές)",
+    "emptyTable": "Δεν βρέθηκαν δεδομένα",
+    "paginate": {
+        "first": "Πρώτη",
+        "last": "Τελευταία",
+        "next": "Επόμενη",
+        "previous": "Προηγούμενη"
+    },
+    "processing": "Επεξεργασία..."
+};
+
+$(document).ready(function() {
+    // Mobile Menu Toggle
+    $('.mobile-menu-btn').on('click', function() {
+        $('.sidebar').toggleClass('open');
+    });
+
+    // Close sidebar when clicking outside on mobile
+    $(document).on('click', function(e) {
+        if ($(window).width() <= 1024) {
+            if (!$(e.target).closest('.sidebar').length && !$(e.target).closest('.mobile-menu-btn').length) {
+                $('.sidebar').removeClass('open');
+            }
+        }
+    });
+});
 
 function initDatasetSelector(callback) {
     $.get(`${API_BASE}/datasets.php`, function(data) {
@@ -61,7 +103,7 @@ function initDatasetSelector(callback) {
 
 function updateLastUpdated(date) {
     if (date) {
-        $('#lastUpdated').text('Ενημερώθηκε: ' + new Date(date).toLocaleString());
+        $('#lastUpdated').text('Ενημερώθηκε: ' + new Date(date).toLocaleString('el-GR'));
     } else {
         $('#lastUpdated').text('');
     }
@@ -97,7 +139,6 @@ function resetFilters() {
 }
 
 function triggerRefresh() {
-    // Dispatch event or call global update function
     if (typeof updateDashboard === 'function') {
         updateDashboard();
     }
@@ -111,15 +152,41 @@ function getFilterQuery() {
     return q;
 }
 
+// Chart Export with White Background and Title
 function exportChart(canvasId, filename) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    // Create a temporary link
+    // Create a dummy canvas to draw white bg and title
+    const tempCanvas = document.createElement('canvas');
+    const ctx = tempCanvas.getContext('2d');
+
+    // Set dimensions
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height + 50; // Extra space for title
+
+    // Fill white background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Draw Title (Need to fetch from DOM or Chart object? Easier from DOM if strictly requested "Title visibly drawn")
+    // Find title element in .chart-header .chart-title relative to canvas
+    // Or just pass title as arg?
+    // Let's look for sibling h4
+    const titleEl = $(canvas).closest('.chart-card').find('.chart-title');
+    const titleText = titleEl.text() || filename.replace(/_/g, ' ');
+
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 20px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(titleText, tempCanvas.width / 2, 35);
+
+    // Draw original chart
+    ctx.drawImage(canvas, 0, 50);
+
+    // Create link
     const link = document.createElement('a');
     link.download = (filename || 'chart') + '.png';
-
-    // Simple export (transparent)
-    link.href = canvas.toDataURL('image/png');
+    link.href = tempCanvas.toDataURL('image/png');
     link.click();
 }

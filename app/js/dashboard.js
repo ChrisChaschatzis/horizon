@@ -16,18 +16,33 @@ function updateDashboard() {
 
     const query = getFilterQuery();
 
-    // 1. KPIs
+    // 1. KPIs & Data Quality
     $.get(`${API_BASE}/kpis.php?${query}`, function(data) {
+        // Core KPIs
         $('#kpiTotal').text(data.total_projects);
         $('#kpiGreekAny').text(data.projects_with_greece_any_role);
         $('#kpiGreekAnyPct').text(data.percent_with_greece_any_role + '%');
         $('#kpiGreekCoord').text(data.projects_with_greek_coordinator);
         $('#kpiGreekCoordPct').text(data.percent_with_greek_coordinator + '%');
+
+        // Data Quality
+        $('#dqKeywords').text(data.projects_no_keywords);
+        $('#dqPriorities').text(data.projects_no_priorities);
+        $('#dqErrors').text(data.projects_with_errors);
+
+        // Overall Status
+        if (data.projects_with_errors > 0) {
+            $('#kpiStatus').text('Προσοχή').css('color', colors.danger);
+        } else if (data.projects_no_keywords > 0 || data.projects_no_priorities > 0) {
+            $('#kpiStatus').text('Ελλιπή').css('color', colors.warn);
+        } else {
+            $('#kpiStatus').text('OK').css('color', colors.success);
+        }
     });
 
     // 2. Coordinator Ranking
     $.get(`${API_BASE}/ranking.php?${query}&type=coordinator&top=10`, function(res) {
-        renderBarChart('chartCoord', res.labels, res.data, 'Χώρες Συντονιστές');
+        renderBarChart('chartCoord', res.labels, res.data, 'Έργα (Πλήθος)');
     });
 
     // 3. Greek Breakdown
@@ -37,7 +52,7 @@ function updateDashboard() {
 
     // 4. Consortium Ranking
     $.get(`${API_BASE}/ranking.php?${query}&type=consortium&top=10`, function(res) {
-        renderBarChart('chartConsortium', res.labels, res.data, 'Χώρες Κοινοπραξίας');
+        renderBarChart('chartConsortium', res.labels, res.data, 'Έργα (Πλήθος)');
     });
 }
 
@@ -71,7 +86,7 @@ function renderBarChart(canvasId, labels, data, label) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: colors.glass2, borderColor: colors.stroke }
+                    grid: { color: colors.grid, borderColor: colors.muted }
                 },
                 x: {
                     grid: { display: false }
@@ -97,7 +112,7 @@ function renderDoughnutChart(canvasId, labels, data) {
             labels: labels,
             datasets: [{
                 data: data,
-                backgroundColor: [colors.accent, colors.accent2, colors.warn],
+                backgroundColor: [colors.accent, colors.accent2, colors.warn, colors.danger],
                 borderColor: colors.bg1,
                 borderWidth: 2
             }]

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="el">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chart Builder - Horizon Europe BI - Δημιουργία Γραφημάτων</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Horizon Europe BI - Δημιουργία Γραφημάτων</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="css/style.css">
 
@@ -19,7 +19,7 @@
             <nav>
                 <a href="index.php" class="nav-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                    <span>Πίνακας Ελέγχου</span>
+                    <span>Σύνοψη</span>
                 </a>
                 <a href="analytics.php" class="nav-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
@@ -31,13 +31,14 @@
                 </a>
                 <a href="datasets.php" class="nav-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                    <span>Δεδομένα</span>
+                    <span>Διαχείριση Δεδομένων</span>
                 </a>
             </nav>
         </aside>
 
         <main class="main-content">
             <div class="top-bar">
+                <button class="mobile-menu-btn" style="margin-right: 1rem;">☰</button>
                 <div class="filters-bar">
                     <select id="datasetSelector" class="dataset-selector"></select>
                 </div>
@@ -65,6 +66,8 @@
                             <option value="fields_of_science">Επιστημονικό Πεδίο</option>
                             <option value="keyword">Λέξη-Κλειδί</option>
                             <option value="invest_priority">Επενδυτική Προτεραιότητα</option>
+                            <option value="pillar">Πρόγραμμα / Pillar</option>
+                            <option value="type_of_action">Τύπος Δράσης</option>
                             <option value="year">Έτος</option>
                             <option value="has_greek_any_role">Ελληνικός Ρόλος (Ναι/Όχι)</option>
                             <option value="is_greek_coordinator">Έλληνας Συντονιστής (Ναι/Όχι)</option>
@@ -103,7 +106,7 @@
                 <div class="chart-header">
                     <h4 class="chart-title" id="chartTitle">Προσαρμοσμένο Γράφημα</h4>
                     <div class="chart-actions">
-                         <button class="btn-icon" onclick="exportChart('customChart', 'Custom_Chart')">📷 PNG</button>
+                         <button class="btn-icon" onclick="exportChart('customChart', 'Custom_Chart')">📷 Εξαγωγή σε PNG</button>
                     </div>
                 </div>
                 <div class="chart-container" style="height: 500px;">

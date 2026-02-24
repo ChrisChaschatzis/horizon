@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="el">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horizon Europe BI Dashboard - Πίνακας Ελέγχου</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Horizon Europe BI - Σύνοψη</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="css/style.css">
 
@@ -25,7 +25,7 @@
                         <rect x="14" y="14" width="7" height="7"></rect>
                         <rect x="3" y="14" width="7" height="7"></rect>
                     </svg>
-                    <span>Πίνακας Ελέγχου</span>
+                    <span>Σύνοψη</span>
                 </a>
                 <a href="analytics.php" class="nav-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -50,7 +50,7 @@
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                         <polyline points="10 9 9 9 8 9"></polyline>
                     </svg>
-                    <span>Δεδομένα</span>
+                    <span>Διαχείριση Δεδομένων</span>
                 </a>
             </nav>
         </aside>
@@ -59,6 +59,7 @@
         <main class="main-content">
             <!-- Top Bar -->
             <div class="top-bar">
+                <button class="mobile-menu-btn">☰</button>
                 <div class="filters-bar">
                     <select id="datasetSelector" class="dataset-selector">
                         <option value="">Φόρτωση δεδομένων...</option>
@@ -74,34 +75,34 @@
                         ✅ Έγκυρα Έργα
                     </button>
                     <button class="filter-btn" onclick="resetFilters()">
-                        🔄 Επαναφορά
+                        🔄 Καθαρισμός Φίλτρων
                     </button>
                 </div>
-                <div id="lastUpdated" style="color: var(--muted); font-size: 0.9rem;"></div>
+                <div id="lastUpdated" style="color: var(--muted); font-size: 0.85rem; font-weight: 500;"></div>
             </div>
 
             <!-- KPI Cards -->
             <div class="kpi-grid">
                 <div class="card kpi-card">
-                    <h3>Σύνολο Έργων</h3>
+                    <h3>Συνολικά Έργα</h3>
                     <div class="kpi-value" id="kpiTotal">0</div>
-                    <div class="kpi-sub">Προβολή Φίλτρου</div>
+                    <div class="kpi-sub">Επιλεγμένο Dataset</div>
                 </div>
                 <div class="card kpi-card">
-                    <h3>Ελληνική Συμμετοχή</h3>
+                    <h3>Έργα με Ελληνική Συμμετοχή</h3>
                     <div class="kpi-value" id="kpiGreekAny">0</div>
                     <div class="kpi-sub" id="kpiGreekAnyPct">0%</div>
                 </div>
                 <div class="card kpi-card">
-                    <h3>Έλληνας Συντονιστής</h3>
+                    <h3>Έργα με Έλληνα Συντονιστή</h3>
                     <div class="kpi-value" id="kpiGreekCoord">0</div>
                     <div class="kpi-sub" id="kpiGreekCoordPct">0%</div>
                 </div>
-                 <!-- Data Quality / Completeness could be dynamic -->
+                 <!-- Quick Data Quality Status -->
                  <div class="card kpi-card">
-                    <h3>Κατάσταση Έργων</h3>
-                    <div class="kpi-value" id="kpiStatus">OK</div>
-                    <div class="kpi-sub">Ποιότητα Δεδομένων</div>
+                    <h3>Ποιότητα Δεδομένων</h3>
+                    <div class="kpi-value" id="kpiStatus" style="font-size: 1.5rem; margin-top: 0.5rem;">OK</div>
+                    <div class="kpi-sub">Κατάσταση</div>
                 </div>
             </div>
 
@@ -110,9 +111,9 @@
                 <!-- Coordinator Ranking -->
                 <div class="card chart-card">
                     <div class="chart-header">
-                        <h4 class="chart-title">Κορυφαίες Χώρες Συντονιστές</h4>
+                        <h4 class="chart-title">Κατάταξη Χωρών Συντονιστών</h4>
                         <div class="chart-actions">
-                            <button class="btn-icon" onclick="exportChart('chartCoord', 'Coordinator_Ranking')">📷 PNG</button>
+                            <button class="btn-icon" onclick="exportChart('chartCoord', 'Coordinator_Ranking')">📷 Εξαγωγή σε PNG</button>
                         </div>
                     </div>
                     <div class="chart-container">
@@ -125,7 +126,7 @@
                     <div class="chart-header">
                         <h4 class="chart-title">Ανάλυση Ελληνικής Συμμετοχής</h4>
                         <div class="chart-actions">
-                             <button class="btn-icon" onclick="exportChart('chartGreek', 'Greek_Breakdown')">📷 PNG</button>
+                             <button class="btn-icon" onclick="exportChart('chartGreek', 'Greek_Breakdown')">📷 Εξαγωγή σε PNG</button>
                         </div>
                     </div>
                     <div class="chart-container">
@@ -136,13 +137,32 @@
                 <!-- Consortium Ranking -->
                 <div class="card chart-card full-width">
                      <div class="chart-header">
-                        <h4 class="chart-title">Κορυφαίες Χώρες Κοινοπραξίας (Όλοι οι Ρόλοι)</h4>
+                        <h4 class="chart-title">Κατάταξη Χωρών στις Κοινοπραξίες</h4>
                         <div class="chart-actions">
-                             <button class="btn-icon" onclick="exportChart('chartConsortium', 'Consortium_Ranking')">📷 PNG</button>
+                             <button class="btn-icon" onclick="exportChart('chartConsortium', 'Consortium_Ranking')">📷 Εξαγωγή σε PNG</button>
                         </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="chartConsortium"></canvas>
+                    </div>
+                </div>
+
+                <!-- Data Quality Details -->
+                <div class="card full-width" style="margin-top: 0;">
+                    <h4 class="chart-title" style="margin-bottom: 1.5rem;">Λεπτομέρειες Ποιότητας Δεδομένων</h4>
+                    <div class="kpi-grid" style="margin-bottom: 0; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                         <div class="kpi-card" style="border: none; background: transparent; padding: 0; box-shadow: none;">
+                             <h3>Χωρίς Λέξεις-Κλειδιά</h3>
+                             <div class="kpi-value" style="color: var(--danger); font-size: 2rem;" id="dqKeywords">0</div>
+                         </div>
+                         <div class="kpi-card" style="border: none; background: transparent; padding: 0; box-shadow: none;">
+                             <h3>Χωρίς Προτεραιότητες</h3>
+                             <div class="kpi-value" style="color: var(--warning); font-size: 2rem;" id="dqPriorities">0</div>
+                         </div>
+                         <div class="kpi-card" style="border: none; background: transparent; padding: 0; box-shadow: none;">
+                             <h3>Σφάλματα Άντλησης</h3>
+                             <div class="kpi-value" style="color: var(--danger); font-size: 2rem;" id="dqErrors">0</div>
+                         </div>
                     </div>
                 </div>
             </div>

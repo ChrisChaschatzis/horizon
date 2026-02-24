@@ -12,8 +12,7 @@ if (!$datasetId) {
     exit;
 }
 
-$filters = $_GET; // Use all query params
-// Ensure dataset_id is in filters for helper
+$filters = $_GET;
 $filters['dataset_id'] = $datasetId;
 
 $where = FilterHelper::buildWhereClause($filters, 'p');
@@ -21,44 +20,33 @@ $where = FilterHelper::buildWhereClause($filters, 'p');
 $sql = "SELECT
     COUNT(*) as total_projects,
     SUM(p.has_greek_any_role) as projects_with_greece_any_role,
-    SUM(p.is_greek_coordinator) as projects_with_greek_coordinator
+    SUM(p.is_greek_coordinator) as projects_with_greek_coordinator,
+    SUM(CASE WHEN p.keywords_text IS NULL OR p.keywords_text = '' THEN 1 ELSE 0 END) as projects_no_keywords,
+    SUM(CASE WHEN p.invest_priorities_json IS NULL OR p.invest_priorities_json = '{}' OR p.invest_priorities_json = '' THEN 1 ELSE 0 END) as projects_no_priorities,
+    SUM(CASE WHEN p.error_text IS NOT NULL AND p.error_text != '' THEN 1 ELSE 0 END) as projects_with_errors
     FROM projects p
     WHERE " . $where['sql'];
 
 try {
     $stmt = $pdo->prepare($sql);
-
-    // Bind parameters
-    foreach ($where['params'] as $key => $val) {
-        $stmt->bindValue(":$key", $val); // Explicit binding to be safe with types if needed, but execute handles strings well.
-        // Actually simpler to just execute($params) but let's see.
-    }
-    $stmt->execute(); // execute() with bound params if using bindValue. Or pass array.
-    // If I used bindValue, I call execute().
-    // If I pass array to execute, I don't use bindValue.
-
-    // Let's use array execution as it's cleaner with FilterHelper returning array.
-    // But FilterHelper returned keys without colon.
-    // PDO execute requires keys to match placeholder names (with or without colon).
-    // Let's check FilterHelper logic.
-    // keys: dataset_id, cc_0...
-    // sql: :dataset_id, :cc_0...
-    // This works fine.
-
     $stmt->execute($where['params']);
-
     $result = $stmt->fetch();
 
-    $total = $result['total_projects'] ?? 0;
-    $greekAny = $result['projects_with_greece_any_role'] ?? 0;
-    $greekCoord = $result['projects_with_greek_coordinator'] ?? 0;
+    $total = (int)($result['total_projects'] ?? 0);
+    $greekAny = (int)($result['projects_with_greece_any_role'] ?? 0);
+    $greekCoord = (int)($result['projects_with_greek_coordinator'] ?? 0);
 
     $kpis = [
-        'total_projects' => (int)$total,
-        'projects_with_greece_any_role' => (int)$greekAny,
+        'total_projects' => $total,
+        'projects_with_greece_any_role' => $greekAny,
         'percent_with_greece_any_role' => $total > 0 ? round(($greekAny / $total) * 100, 2) : 0,
-        'projects_with_greek_coordinator' => (int)$greekCoord,
-        'percent_with_greek_coordinator' => $total > 0 ? round(($greekCoord / $total) * 100, 2) : 0
+        'projects_with_greek_coordinator' => $greekCoord,
+        'percent_with_greek_coordinator' => $total > 0 ? round(($greekCoord / $total) * 100, 2) : 0,
+
+        // Data Quality
+        'projects_no_keywords' => (int)($result['projects_no_keywords'] ?? 0),
+        'projects_no_priorities' => (int)($result['projects_no_priorities'] ?? 0),
+        'projects_with_errors' => (int)($result['projects_with_errors'] ?? 0)
     ];
 
     echo json_encode($kpis);
