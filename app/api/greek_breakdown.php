@@ -29,15 +29,20 @@ try {
     $stmt->execute($where['params']);
     $result = $stmt->fetch();
 
+    // Since these flags are not mutually exclusive (a project can have both),
+    // and usually "Participant" includes "Coordinator",
+    // displaying them in a Doughnut chart is statistically weird but requested.
+    // We will translate labels.
+
     $data = [
-        'labels' => ['Coordinator', 'Participant', 'Beneficiary'],
+        'labels' => ['Συντονιστής', 'Συμμετέχων', 'Δικαιούχος'],
         'data' => [
-            (int)$result['greek_coordinator'],
-            (int)$result['greek_participant'],
-            (int)$result['greek_beneficiary']
+            (int)($result['greek_coordinator'] ?? 0),
+            (int)($result['greek_participant'] ?? 0),
+            (int)($result['greek_beneficiary'] ?? 0)
         ],
-        'total_greek' => (int)$result['greek_any_role'],
-        'total_projects' => (int)$result['total_projects']
+        'total_greek' => (int)($result['greek_any_role'] ?? 0),
+        'total_projects' => (int)($result['total_projects'] ?? 0)
     ];
 
     echo json_encode($data);

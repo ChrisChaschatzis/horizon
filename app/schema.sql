@@ -1,4 +1,4 @@
--- SQLite Schema
+-- SQLite Schema (Updated)
 
 CREATE TABLE IF NOT EXISTS datasets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -12,26 +12,43 @@ CREATE TABLE IF NOT EXISTS datasets (
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     dataset_id INTEGER NOT NULL,
+
+    -- Core Identity
     project_id TEXT NOT NULL,
-    cordis_url TEXT,
-    title TEXT,
+    project_number TEXT,
     acronym TEXT,
+    title TEXT,
+    cordis_url TEXT,
+
+    -- Metadata
+    framework_programme TEXT,
+    pillar TEXT,
+    thematic_priority TEXT,
+    type_of_action TEXT,
+    status TEXT,
+    signature_date DATE,
+
+    -- Financials
+    eu_contribution REAL,
+    net_eu_contribution REAL,
+    total_cost REAL,
+
+    -- Coordinator
     coordinator_name TEXT,
     coordinator_country TEXT,
+
+    -- Greek Flags
     has_greek_participant INTEGER DEFAULT 0,
     has_greek_beneficiary INTEGER DEFAULT 0,
     has_greek_any_role INTEGER DEFAULT 0,
     is_greek_coordinator INTEGER DEFAULT 0,
+
+    -- Enhanced Data
     keywords_text TEXT,
     fields_text TEXT,
     invest_priorities_json TEXT,
-    signature_date DATE,
-    eu_contribution REAL,
-    total_cost REAL,
-    pillar TEXT,
-    type_of_action TEXT,
-    status TEXT,
     error_text TEXT,
+
     FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE CASCADE
 );
 

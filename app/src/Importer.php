@@ -4,6 +4,7 @@ require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 class Importer {
     private $pdo;
@@ -13,7 +14,6 @@ class Importer {
     }
 
     public function import($excelPath, $jsonlPath, $datasetName, $notes = '') {
-        // Increase limits for large imports
         set_time_limit(0);
         ini_set('memory_limit', '512M');
 
@@ -26,7 +26,6 @@ class Importer {
             $datasetId = $this->pdo->lastInsertId();
 
             // 2. Parse Excel
-            // Using ReadDataOnly for memory efficiency since we don't need formatting
             $reader = IOFactory::createReaderForFile($excelPath);
             $reader->setReadDataOnly(true);
             $spreadsheet = $reader->load($excelPath);
@@ -40,31 +39,25 @@ class Importer {
 
             // Map headers
             $headers = array_shift($rows);
-            // Clean headers (trim)
             $headers = array_map(function($h) { return trim((string)$h); }, $headers);
             $headerMap = array_flip($headers);
 
-            // Map headers - Handle variations
+            // Flexible Mapping
             $map = [];
             foreach ($headerMap as $h => $idx) {
                 $cleanH = strtolower(trim($h));
                 $map[$cleanH] = $idx;
-                // Also map snake_case versions
                 $map[str_replace(' ', '_', $cleanH)] = $idx;
             }
 
-            // Check for required column project_id (or variations)
+            // Check required ID column
             $pidIndex = $map['project_id'] ?? $map['project_number'] ?? $map['projectnumber'] ?? null;
-
             if ($pidIndex === null) {
-                 // Try to find it by value? No, header is safer.
-                 // Debug:
-                 // throw new Exception("Excel missing required column 'project_id' or 'Project number'. Found: " . implode(', ', array_keys($headerMap)));
                  throw new Exception("Λείπει η υποχρεωτική στήλη 'project_id' ή 'Project number' από το Excel");
             }
 
+            // Index Excel Rows by Project ID
             $projectDataMap = [];
-
             foreach ($rows as $row) {
                 $pid = $row[$pidIndex] ?? null;
                 if (!$pid) continue;
@@ -74,7 +67,7 @@ class Importer {
                 ];
             }
 
-            // 3. Parse JSONL (if provided)
+            // 3. Parse JSONL (if provided) and Merge
             if ($jsonlPath && file_exists($jsonlPath)) {
                 $jsonlHandle = fopen($jsonlPath, 'r');
                 if ($jsonlHandle) {
@@ -85,17 +78,18 @@ class Importer {
                         $pid = (string)$jsonObj['project_id'];
 
                         if (isset($projectDataMap[$pid])) {
-                            $this->insertProject($datasetId, $projectDataMap[$pid], $jsonObj);
-                            unset($projectDataMap[$pid]);
+                            // Found in Excel, Insert with JSONL enrichment
+                            $this->insertProject($datasetId, $projectDataMap[$pid]['row'], $projectDataMap[$pid]['map'], $jsonObj);
+                            unset($projectDataMap[$pid]); // Remove processed
                         }
                     }
                     fclose($jsonlHandle);
                 }
             }
 
-            // Insert remaining projects
+            // 4. Insert Remaining Projects (Excel only)
             foreach ($projectDataMap as $pid => $data) {
-                 $this->insertProject($datasetId, $data, null);
+                 $this->insertProject($datasetId, $data['row'], $data['map'], null);
             }
 
             $this->pdo->commit();
@@ -109,119 +103,137 @@ class Importer {
         }
     }
 
-    private function insertProject($datasetId, $excelData, $jsonData) {
-        $row = $excelData['row'];
-        $map = $excelData['map'];
-
-        $projectId = $row[$map['project_id'] ?? $map['project_number'] ?? $map['projectnumber']];
-        $cordisUrl = $row[$map['cordis_url'] ?? $map['cordis_link'] ?? $map['cordislink'] ?? -1] ?? '';
-        $title = $row[$map['cordis_title'] ?? $map['title'] ?? -1] ?? '';
-        $acronym = $row[$map['cordis_acronym'] ?? $map['project_acronym'] ?? $map['acronym'] ?? -1] ?? '';
-        $coordName = $row[$map['coordinator_name'] ?? -1] ?? '';
-        $coordCountry = $row[$map['coordinator_country'] ?? -1] ?? '';
-
-        $hasGreekPart = $this->parseBoolean($row[$map['has_greek_participant'] ?? -1] ?? 0);
-        $hasGreekBen = $this->parseBoolean($row[$map['has_greek_beneficiary'] ?? -1] ?? 0);
-        $hasGreekAny = $this->parseBoolean($row[$map['has_greek_any_role'] ?? -1] ?? 0);
-        $isGreekCoord = $this->parseBoolean($row[$map['is_greek_coordinator'] ?? -1] ?? 0);
-
-        $keywordsText = $row[$map['keywords'] ?? -1] ?? '';
-        $fieldsText = $row[$map['fields_of_science'] ?? -1] ?? '';
-        $investJson = $row[$map['invest_priorities_json'] ?? -1] ?? '{}';
-
-        // Handle explicit column names from user if they differ
-        // "Project Net EU Contribution (EUR)" might be eu_contribution
-        $euContribution = $row[$map['eu_contribution'] ?? $map['project_eu_contribution_(eur)'] ?? $map['project_net_eu_contribution_(eur)'] ?? -1] ?? null;
-        $totalCost = $row[$map['total_cost'] ?? $map['project_total_cost_(eur)'] ?? -1] ?? null;
-        $status = $row[$map['status'] ?? $map['project_status'] ?? -1] ?? null;
-        $signatureDate = $row[$map['signature_date'] ?? -1] ?? null;
-        $pillar = $row[$map['pillar'] ?? -1] ?? null;
-        $typeOfAction = $row[$map['type_of_action'] ?? -1] ?? null;
-
-        // Enrichment
-        if ($jsonData) {
-            if (empty($coordCountry) && isset($jsonData['coordinator_country'])) {
-                $coordCountry = $jsonData['coordinator_country'];
+    private function insertProject($datasetId, $row, $map, $jsonData) {
+        // Helper to get value from Excel row
+        $get = function($keys, $default = null) use ($row, $map) {
+            if (!is_array($keys)) $keys = [$keys];
+            foreach ($keys as $k) {
+                $k = strtolower($k);
+                if (isset($map[$k])) return $row[$map[$k]];
+                $k_snake = str_replace(' ', '_', $k);
+                if (isset($map[$k_snake])) return $row[$map[$k_snake]];
             }
-            if (isset($jsonData['keywords']) && is_array($jsonData['keywords'])) {
-                $keywordsText = implode('; ', $jsonData['keywords']);
-            }
-            if (isset($jsonData['fields_of_science']) && is_array($jsonData['fields_of_science'])) {
-                $fieldsText = implode('; ', $jsonData['fields_of_science']);
-            }
-            if (isset($jsonData['invest_priorities']) && (is_array($jsonData['invest_priorities']) || is_object($jsonData['invest_priorities']))) {
-                $investJson = json_encode($jsonData['invest_priorities']);
-            }
+            return $default;
+        };
+
+        // --- Core Identity ---
+        $projectId = $get(['project_id', 'project_number']);
+        $projectNumber = $get(['project_number', 'project_id']);
+        $acronym = $get(['project_acronym', 'acronym', 'cordis_acronym']);
+        $title = $get(['cordis_title', 'title']);
+        $cordisUrl = $get(['cordis_url', 'cordis_link']);
+
+        // --- Metadata ---
+        $framework = $get(['framework_programme']);
+        $pillar = $get(['pillar']);
+        $thematicPriority = $get(['thematic_priority']);
+        $typeOfAction = $get(['type_of_action']);
+        $status = $get(['project_status', 'status']);
+        $signatureDate = $get(['signature_date']);
+
+        // Date parsing
+        if ($signatureDate) {
+             if (is_numeric($signatureDate)) {
+                 $signatureDate = Date::excelToDateTimeObject($signatureDate)->format('Y-m-d');
+             } else {
+                 $ts = strtotime($signatureDate);
+                 if ($ts) $signatureDate = date('Y-m-d', $ts);
+                 else $signatureDate = null;
+             }
         }
 
-        $stmt = $this->pdo->prepare("
-            INSERT INTO projects (
-                dataset_id, project_id, cordis_url, title, acronym,
-                coordinator_name, coordinator_country,
-                has_greek_participant, has_greek_beneficiary, has_greek_any_role, is_greek_coordinator,
-                keywords_text, fields_text, invest_priorities_json,
-                eu_contribution, total_cost, status, signature_date, pillar, type_of_action
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        // --- Financials ---
+        $euContribution = $this->parseMoney($get(['project_eu_contribution_(eur)', 'eu_contribution']));
+        $netEuContribution = $this->parseMoney($get(['project_net_eu_contribution_(eur)', 'net_eu_contribution']));
+        $totalCost = $this->parseMoney($get(['project_total_cost_(eur)', 'total_cost']));
 
+        // --- Coordinator ---
+        $coordName = $get(['coordinator_name']);
+        $coordCountry = $get(['coordinator_country']);
+
+        // --- Greek Flags (Strict Boolean) ---
+        $hasGreekPart = $this->parseBoolean($get(['has_greek_participant']));
+        $hasGreekBen = $this->parseBoolean($get(['has_greek_beneficiary']));
+        $hasGreekAny = $this->parseBoolean($get(['has_greek_any_role']));
+        $isGreekCoord = $this->parseBoolean($get(['is_greek_coordinator']));
+
+        // --- Enhanced Data ---
+        $keywordsText = $get(['keywords']);
+        $fieldsText = $get(['fields_of_science']);
+        $investJson = $get(['invest_priorities_json'], '{}');
+        $errorText = $get(['error']);
+
+        // Enrichment overrides (if JSON provided and Excel missing)
+        if ($jsonData) {
+            if (empty($coordCountry) && isset($jsonData['coordinator_country'])) $coordCountry = $jsonData['coordinator_country'];
+            // If Excel columns are missing, we could fallback to JSON here, but "Strict Excel" implies Excel is truth.
+            // We'll trust Excel for the 24 columns.
+        }
+
+        $sql = "INSERT INTO projects (
+            dataset_id, project_id, project_number, acronym, title, cordis_url,
+            framework_programme, pillar, thematic_priority, type_of_action, status, signature_date,
+            eu_contribution, net_eu_contribution, total_cost,
+            coordinator_name, coordinator_country,
+            has_greek_participant, has_greek_beneficiary, has_greek_any_role, is_greek_coordinator,
+            keywords_text, fields_text, invest_priorities_json, error_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
-            $datasetId, $projectId, $cordisUrl, $title, $acronym,
+            $datasetId, $projectId, $projectNumber, $acronym, $title, $cordisUrl,
+            $framework, $pillar, $thematicPriority, $typeOfAction, $status, $signatureDate,
+            $euContribution, $netEuContribution, $totalCost,
             $coordName, $coordCountry,
             $hasGreekPart, $hasGreekBen, $hasGreekAny, $isGreekCoord,
-            $keywordsText, $fieldsText, $investJson,
-            $euContribution, $totalCost, $status, $signatureDate, $pillar, $typeOfAction
+            $keywordsText, $fieldsText, $investJson, $errorText
         ]);
 
         $projectDbId = $this->pdo->lastInsertId();
 
-        // Normalized Tables
+        // --- Normalized Tables ---
 
-        // Coordinator
+        // 1. Coordinator Country (Always)
         if ($coordCountry) {
             $this->insertCountry($datasetId, $projectDbId, $coordCountry, 'coordinator');
         }
 
-        // JSONL Participants/Beneficiaries
+        // 2. Consortium Participants (From JSONL if available)
         if ($jsonData) {
             if (isset($jsonData['participants']) && is_array($jsonData['participants'])) {
                 foreach ($jsonData['participants'] as $p) {
                     if (isset($p['country'])) {
+                        // Avoid duplicating coordinator if it's in the list?
+                        // "A country should only be counted once per project_id" -> handled in query usually,
+                        // but here we store raw participants.
                         $this->insertCountry($datasetId, $projectDbId, $p['country'], 'participant');
                     }
                 }
             }
-            if (isset($jsonData['beneficiaries']) && is_array($jsonData['beneficiaries'])) {
-                foreach ($jsonData['beneficiaries'] as $b) {
-                    if (isset($b['country'])) {
-                         $this->insertCountry($datasetId, $projectDbId, $b['country'], 'beneficiary');
-                    }
-                }
-            }
+        } else {
+            // If NO JSONL, we can't populate 'participant' roles other than coordinator (who is also a participant).
+            // But we should at least ensure 'coordinator' is in project_countries (done above).
         }
 
-        // Keywords
+        // 3. Keywords (Semicolon separated)
         if ($keywordsText) {
             $keywords = explode(';', $keywordsText);
             foreach ($keywords as $k) {
                 $k = trim($k);
-                if ($k) {
-                    $this->insertKeyword($datasetId, $projectDbId, $k);
-                }
+                if ($k) $this->insertKeyword($datasetId, $projectDbId, $k);
             }
         }
 
-        // Fields
+        // 4. Fields (Semicolon separated paths)
         if ($fieldsText) {
              $fields = explode(';', $fieldsText);
              foreach ($fields as $f) {
                  $f = trim($f);
-                 if ($f) {
-                     $this->insertField($datasetId, $projectDbId, $f);
-                 }
+                 if ($f) $this->insertField($datasetId, $projectDbId, $f);
              }
         }
 
-        // Priorities
+        // 5. Priorities (JSON)
         $priorities = json_decode($investJson, true);
         if ($priorities) {
             foreach ($priorities as $label => $percent) {
@@ -263,5 +275,12 @@ class Importer {
         if ($s === 'TRUE' || $s === 'YES' || $s === 'Y') return 1;
 
         return 0;
+    }
+
+    private function parseMoney($value) {
+        if ($value === null || $value === '') return null;
+        if (is_numeric($value)) return (float)$value;
+        // Basic cleanup for strings like "1000.00" or "1000"
+        return (float)filter_var($value, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
     }
 }

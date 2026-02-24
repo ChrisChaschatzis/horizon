@@ -65,7 +65,6 @@ $(document).ready(function() {
 
 function loadDatasets() {
     $.get(`${API_BASE}/datasets.php`, function(data) {
-        // Check if DataTable already initialized
         let table;
         if ($.fn.DataTable.isDataTable('#datasetsTable')) {
             table = $('#datasetsTable').DataTable();
@@ -74,25 +73,14 @@ function loadDatasets() {
             table = $('#datasetsTable').DataTable({
                 pageLength: 10,
                 dom: 'fltip',
-                language: {
-                    search: "",
-                    searchPlaceholder: "Αναζήτηση...",
-                    paginate: {
-                        previous: "Προηγ.",
-                        next: "Επόμ."
-                    },
-                    info: "Εμφάνιση _START_ έως _END_ από _TOTAL_ εγγραφές",
-                    infoEmpty: "Εμφάνιση 0 έως 0 από 0 εγγραφές",
-                    infoFiltered: "(φιλτραρισμένο από _MAX_ συνολικά εγγραφές)",
-                    lengthMenu: "Εμφάνιση _MENU_ εγγραφών"
-                },
+                language: datatableGreek,
                 order: [[0, 'desc']] // Sort by ID desc
             });
             table.clear();
         }
 
         data.forEach(d => {
-            const date = new Date(d.created_at).toLocaleString();
+            const date = new Date(d.created_at).toLocaleString('el-GR');
             const deleteBtn = `<button class="btn-icon" onclick="deleteDataset(${d.id})" style="color:var(--danger); border-color:var(--danger);">Διαγραφή</button>`;
 
             table.row.add([
