@@ -17,11 +17,164 @@ class Importer {
         set_time_limit(0);
         ini_set('memory_limit', '512M');
 
+        // Check if this is a Summary Pack
+        if ($this->isSummaryPack($excelPath)) {
+            return $this->importSummaryDataset($excelPath, $datasetName, $notes);
+        }
+
+        // Otherwise Standard CORDIS Import
+        return $this->importCordisDataset($excelPath, $jsonlPath, $datasetName, $notes);
+    }
+
+    private function isSummaryPack($excelPath) {
+        try {
+            $reader = IOFactory::createReaderForFile($excelPath);
+            $reader->setReadDataOnly(true);
+            $names = $reader->listWorksheetNames($excelPath);
+            // Check for unique sheets created by Converter
+            // "pillar_participation" is a strong indicator
+            return in_array('pillar_participation', $names) || in_array('programme_participation', $names);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * IMPORT SUMMARY DATASET
+     */
+    private function importSummaryDataset($excelPath, $datasetName, $notes) {
+        $this->pdo->beginTransaction();
+        try {
+            // 1. Create Dataset
+            $stmt = $this->pdo->prepare("INSERT INTO datasets (name, excel_filename, jsonl_filename, notes, dataset_type) VALUES (?, ?, NULL, ?, 'summary')");
+            $stmt->execute([$datasetName, basename($excelPath), $notes]);
+            $datasetId = $this->pdo->lastInsertId();
+
+            $reader = IOFactory::createReaderForFile($excelPath);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($excelPath);
+
+            // Read META to get some info? Not strictly needed for logic but good for entities count.
+            // We will derive entities count from summary_groups table.
+
+            // Load all sheets
+            $sheetNames = $spreadsheet->getSheetNames();
+            $groupIds = []; // map 'Label' => id
+
+            // Helper to get group ID or create it
+            $getGroupId = function($label) use ($datasetId, &$groupIds) {
+                if (!$label) return null;
+                if (isset($groupIds[$label])) return $groupIds[$label];
+
+                // Insert
+                $stmt = $this->pdo->prepare("INSERT INTO summary_groups (dataset_id, group_label) VALUES (?, ?)");
+                $stmt->execute([$datasetId, $label]);
+                $id = $this->pdo->lastInsertId();
+                $groupIds[$label] = $id;
+                return $id;
+            };
+
+            foreach ($sheetNames as $name) {
+                $sheet = $spreadsheet->getSheetByName($name);
+                $rows = $sheet->toArray();
+                if (empty($rows)) continue;
+
+                $header = array_shift($rows); // Remove header
+
+                // --- PILLAR PARTICIPATION ---
+                if ($name === 'pillar_participation') {
+                    $stmt = $this->pdo->prepare("INSERT INTO summary_pillar_participation (dataset_id, group_id, pillar_descr, participation) VALUES (?, ?, ?, ?)");
+                    foreach ($rows as $row) {
+                        // A: Group, B: Pillar, C: Part
+                        $gid = $getGroupId($row[0]);
+                        if (!$gid) continue;
+                        $stmt->execute([$datasetId, $gid, $row[1], (int)$row[2]]);
+                    }
+                }
+
+                // --- PROGRAMME PARTICIPATION ---
+                elseif ($name === 'programme_participation') {
+                    $stmt = $this->pdo->prepare("INSERT INTO summary_programme_participation (dataset_id, group_id, framework_programme, participation) VALUES (?, ?, ?, ?)");
+                    foreach ($rows as $row) {
+                        $gid = $getGroupId($row[0]);
+                        if (!$gid) continue;
+                        $stmt->execute([$datasetId, $gid, $row[1], (int)$row[2]]);
+                    }
+                }
+
+                // --- PROGRAMME EU CONTRIBUTION ---
+                elseif ($name === 'programme_eu_contribution') {
+                    $stmt = $this->pdo->prepare("INSERT INTO summary_programme_eu_contribution (dataset_id, group_id, framework_programme, eu_contribution_eur) VALUES (?, ?, ?, ?)");
+                    foreach ($rows as $row) {
+                        $gid = $getGroupId($row[0]);
+                        if (!$gid) continue;
+                        $stmt->execute([$datasetId, $gid, $row[1], (float)$row[2]]);
+                    }
+                }
+
+                // --- MISSION EU CONTRIBUTION ---
+                elseif ($name === 'mission_eu_contribution') {
+                    $stmt = $this->pdo->prepare("INSERT INTO summary_mission_eu_contribution (dataset_id, group_id, mission, eu_contribution_eur) VALUES (?, ?, ?, ?)");
+                    foreach ($rows as $row) {
+                        $gid = $getGroupId($row[0]);
+                        if (!$gid) continue;
+                        $stmt->execute([$datasetId, $gid, $row[1], (float)$row[2]]);
+                    }
+                }
+
+                // --- COUNTRY NET EU (Optional) ---
+                elseif ($name === 'country_net_eu_contribution') {
+                    $stmt = $this->pdo->prepare("INSERT INTO summary_country_net_eu_contribution (dataset_id, group_id, country_territory, net_eu_contribution_eur) VALUES (?, ?, ?, ?)");
+                    foreach ($rows as $row) {
+                        $gid = $getGroupId($row[0]);
+                        if (!$gid) continue;
+                        $stmt->execute([$datasetId, $gid, $row[1], (float)$row[2]]);
+                    }
+                }
+
+                // --- RANKS (Optional - Consolidated) ---
+                 elseif ($name === 'single_ranks') {
+                    $stmt = $this->pdo->prepare("INSERT INTO summary_ranks (dataset_id, group_id, metric_key, rank_position, rank_total, raw_text) VALUES (?, ?, ?, ?, ?, ?)");
+                    foreach ($rows as $row) {
+                        // A: group, B: key, C: pos, D: total, E: text
+                        $gid = $getGroupId($row[0]);
+                        if (!$gid) continue;
+                        $stmt->execute([
+                            $datasetId,
+                            $gid,
+                            $row[1],
+                            is_numeric($row[2]) ? (int)$row[2] : null,
+                            is_numeric($row[3]) ? (int)$row[3] : null,
+                            $row[4]
+                        ]);
+                    }
+                }
+            }
+
+            // Update entities count
+            $count = count($groupIds);
+            $stmt = $this->pdo->prepare("UPDATE datasets SET entities_count = ? WHERE id = ?");
+            $stmt->execute([$count, $datasetId]);
+
+            $this->pdo->commit();
+            return ['success' => true, 'dataset_id' => $datasetId];
+
+        } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+
+    /**
+     * IMPORT STANDARD CORDIS DATASET (Original Logic)
+     */
+    private function importCordisDataset($excelPath, $jsonlPath, $datasetName, $notes) {
         $this->pdo->beginTransaction();
 
         try {
             // 1. Create Dataset Record
-            $stmt = $this->pdo->prepare("INSERT INTO datasets (name, excel_filename, jsonl_filename, notes) VALUES (?, ?, ?, ?)");
+            $stmt = $this->pdo->prepare("INSERT INTO datasets (name, excel_filename, jsonl_filename, notes, dataset_type) VALUES (?, ?, ?, ?, 'projects')");
             $stmt->execute([$datasetName, basename($excelPath), $jsonlPath ? basename($jsonlPath) : null, $notes]);
             $datasetId = $this->pdo->lastInsertId();
 

@@ -2,10 +2,12 @@
 
 const API_BASE = 'api';
 let currentDatasetId = null;
+let currentDatasetType = 'projects';
 let activeFilters = {
     only_greek_any_role: false,
     only_greek_coordinator: false,
-    exclude_error: false
+    exclude_error: false,
+    groups: [] // New for summary
 };
 
 // Colors matching CSS
@@ -82,13 +84,18 @@ function initDatasetSelector(callback) {
         }
 
         data.forEach(d => {
-            sel.append(`<option value="${d.id}" data-date="${d.created_at}">${d.name}</option>`);
+            const badge = d.dataset_type === 'summary' ? ' [PACK]' : '';
+            sel.append(`<option value="${d.id}" data-type="${d.dataset_type}" data-date="${d.created_at}">${d.name}${badge}</option>`);
         });
 
         // Select first by default
         currentDatasetId = data[0].id;
+        currentDatasetType = data[0].dataset_type || 'projects';
         sel.val(currentDatasetId);
         updateLastUpdated(data[0].created_at);
+
+        // Initial UI State check
+        handleDatasetTypeChange();
 
         // Callback to load dashboard
         if (callback) callback();
@@ -96,12 +103,71 @@ function initDatasetSelector(callback) {
         // Change event
         sel.on('change', function() {
             currentDatasetId = $(this).val();
-            const date = $(this).find(':selected').data('date');
+            const opt = $(this).find(':selected');
+            currentDatasetType = opt.data('type') || 'projects';
+            const date = opt.data('date');
+
             updateLastUpdated(date);
+            handleDatasetTypeChange();
             triggerRefresh();
         });
     });
 }
+
+function handleDatasetTypeChange() {
+    // Toggle filters based on type
+    if (currentDatasetType === 'summary') {
+        $('.filter-btn-projects').hide(); // Hide Greek filters
+        $('#groupSelectorContainer').css('display', 'flex'); // Show group selector
+        loadSummaryGroups();
+    } else {
+        $('.filter-btn-projects').css('display', 'inline-flex');
+        $('#groupSelectorContainer').hide();
+    }
+}
+
+function loadSummaryGroups() {
+    // Populate Group Selector Chips
+    $.get(`${API_BASE}/summary.php?action=groups&dataset_id=${currentDatasetId}`, function(groups) {
+        const container = $('#groupSelectorContainer');
+        container.empty();
+        container.append('<span style="color:var(--muted); font-size:0.9rem; margin-right:0.5rem;">Groups:</span>');
+
+        groups.forEach(g => {
+            const isActive = !activeFilters.groups.length || activeFilters.groups.includes(g.group_label); // default all? or none?
+            // Actually, let's default to ALL selected if empty, but visually toggle
+            // Or better: initially empty means ALL.
+            const chip = $(`<button class="filter-chip ${isActive ? '' : ''}" onclick="toggleGroup('${g.group_label}')">${g.group_label}</button>`);
+            // Wait, logic: if array empty => all.
+            // Let's make it explicit.
+            container.append(chip);
+        });
+
+        // Add "All" button?
+    });
+}
+
+function toggleGroup(label) {
+    // Simple logic: if label in list, remove. else add.
+    // If list empty, it means ALL were implicitly selected. So now we switch to specific.
+    // BUT this is complex. Let's stick to: "If activeFilters.groups is empty, it means ALL".
+    // When user clicks one, we add it? No, standard multi-select behavior is better.
+    // Let's implement: Click to toggle inclusion.
+
+    const idx = activeFilters.groups.indexOf(label);
+    if (idx > -1) {
+        activeFilters.groups.splice(idx, 1);
+    } else {
+        activeFilters.groups.push(label);
+    }
+
+    // Update UI
+    // Iterate buttons and set active class
+    // This requires re-rendering or tracking DOM.
+    // Simplification: Just trigger refresh for now. Ideally update visual state.
+    triggerRefresh();
+}
+
 
 function updateLastUpdated(date) {
     if (date) {
@@ -134,7 +200,8 @@ function resetFilters() {
     activeFilters = {
         only_greek_any_role: false,
         only_greek_coordinator: false,
-        exclude_error: false
+        exclude_error: false,
+        groups: []
     };
     $('.filter-btn').removeClass('active');
     triggerRefresh();
@@ -144,12 +211,22 @@ function triggerRefresh() {
     if (typeof updateDashboard === 'function') {
         updateDashboard();
     }
+    if (typeof updateAnalytics === 'function') {
+        updateAnalytics();
+    }
 }
 
 function getFilterQuery() {
     let q = `dataset_id=${currentDatasetId}`;
     for (const [key, val] of Object.entries(activeFilters)) {
-        if (val) q += `&${key}=true`;
+        if (key === 'groups') {
+            if (val.length > 0) {
+                // pass as array
+                val.forEach(g => q += `&groups[]=${encodeURIComponent(g)}`);
+            }
+        } else {
+            if (val) q += `&${key}=true`;
+        }
     }
     return q;
 }

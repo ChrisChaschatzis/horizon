@@ -7,7 +7,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
     // List datasets
-    $stmt = $pdo->query("SELECT id, name, created_at, excel_filename, jsonl_filename, notes,
+    $stmt = $pdo->query("SELECT id, name, created_at, excel_filename, jsonl_filename, notes, dataset_type, entities_count,
         (SELECT COUNT(*) FROM projects WHERE dataset_id = datasets.id) as project_count
         FROM datasets ORDER BY created_at DESC");
     echo json_encode($stmt->fetchAll());

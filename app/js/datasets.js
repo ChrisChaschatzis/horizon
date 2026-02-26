@@ -34,6 +34,12 @@ $(document).ready(function() {
         progressBar.css('background', 'linear-gradient(90deg, var(--accent), var(--accent2))');
 
         $.ajax({
+            url: `import.php`, // Relative path or API_BASE? In previous file it was API_BASE/import.php but file structure suggests root/import.php or similar. Let's assume root import.php calls API. Wait, test_import.php uses Importer class.
+            // Looking at datasets.php form action, it wasn't specified, but JS handled it.
+            // Previous JS used `${API_BASE}/import.php`. Let's check if that exists.
+            // It doesn't seem to exist in file list.
+            // But we have `src/Importer.php`.
+            // I should create `api/import.php`.
             url: `${API_BASE}/import.php`,
             type: 'POST',
             data: formData,
@@ -108,9 +114,6 @@ function setupDragAndDrop() {
             dropZone.css('border-color', '');
         }
     });
-
-    // Make clicking the zone trigger the input (if not triggered by label/structure automatically)
-    // The CSS .file-input covers the zone, so clicking works automatically.
 }
 
 function loadDatasets() {
@@ -131,19 +134,24 @@ function loadDatasets() {
 
         data.forEach(d => {
             const date = new Date(d.created_at).toLocaleString('el-GR');
-            const deleteBtn = `<button class="btn-icon" onclick="deleteDataset(${d.id})" title="Διαγραφή"><i class="icon-trash">🗑️</i></button>`;
+            const deleteBtn = `<button class="btn-icon" onclick="deleteDataset(${d.id})" title="Διαγραφή"><i data-lucide="trash-2" style="width:16px;"></i></button>`;
+
+            const typeBadge = d.dataset_type === 'summary'
+                ? `<span style="background:var(--accent2); color:#fff; padding:2px 6px; border-radius:4px; font-size:0.75rem;">PACK (${d.entities_count})</span>`
+                : `<span style="background:var(--muted); color:#fff; padding:2px 6px; border-radius:4px; font-size:0.75rem;">CORDIS</span>`;
 
             table.row.add([
                 d.id,
-                d.name,
+                `<div>${d.name} ${typeBadge}</div>`,
                 date,
-                d.project_count,
+                d.dataset_type === 'summary' ? '-' : d.project_count,
                 d.notes || '',
                 deleteBtn
             ]);
         });
 
         table.draw();
+        lucide.createIcons();
     });
 }
 

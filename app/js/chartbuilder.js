@@ -16,15 +16,66 @@ const dict = {
     'has_greek_any_role': 'Ελληνικός Ρόλος',
     'is_greek_coordinator': 'Έλληνας Συντονιστής',
 
+    // Summary Dimensions
+    'framework_programme': 'Πρόγραμμα',
+    'mission': 'Αποστολή (Mission)',
+    'pillar_descr': 'Pillar',
+    'group_label': 'Group / Entity',
+
     // Metrics
     'count': 'Πλήθος Έργων',
     'sum_eu_contribution': 'Σύνολο Συνεισφοράς ΕΕ (€)',
-    'average_invest_priority': 'Μ.Ο. % Προτεραιότητας'
+    'average_invest_priority': 'Μ.Ο. % Προτεραιότητας',
+
+    // Summary Metrics
+    'participation': 'Συμμετοχές'
 };
 
 $(document).ready(function() {
-    initDatasetSelector();
+    initDatasetSelector(function() {
+        populateOptions();
+        updateDashboard();
+    });
+
+    // Listen for dataset type changes (handled in initDatasetSelector change event)
+    $('#datasetSelector').on('change', function() {
+        populateOptions();
+    });
 });
+
+function populateOptions() {
+    const xSel = $('#cbX');
+    const ySel = $('#cbY');
+    xSel.empty();
+    ySel.empty();
+
+    if (currentDatasetType === 'summary') {
+        // Summary Options
+        xSel.append(new Option('Pillar', 'pillar_descr'));
+        xSel.append(new Option('Framework Programme', 'framework_programme'));
+        xSel.append(new Option('Mission', 'mission'));
+        // xSel.append(new Option('Group', 'group_label')); // Usually series
+
+        ySel.append(new Option('Participations', 'participation'));
+        ySel.append(new Option('EU Contribution (€)', 'sum_eu_contribution'));
+    } else {
+        // Project Options
+        xSel.append(new Option('Χώρα Συντονιστή', 'coordinator_country'));
+        xSel.append(new Option('Χώρα Κοινοπραξίας', 'consortium_country'));
+        xSel.append(new Option('Επιστημονικό Πεδίο', 'fields_of_science'));
+        xSel.append(new Option('Λέξη-Κλειδί', 'keyword'));
+        xSel.append(new Option('Επενδυτική Προτεραιότητα', 'invest_priority'));
+        xSel.append(new Option('Πρόγραμμα / Pillar', 'pillar'));
+        xSel.append(new Option('Τύπος Δράσης', 'type_of_action'));
+        xSel.append(new Option('Έτος', 'year'));
+        xSel.append(new Option('Ελληνικός Ρόλος (Ναι/Όχι)', 'has_greek_any_role'));
+        xSel.append(new Option('Έλληνας Συντονιστής (Ναι/Όχι)', 'is_greek_coordinator'));
+
+        ySel.append(new Option('Πλήθος Έργων', 'count'));
+        ySel.append(new Option('Σύνολο Συνεισφοράς ΕΕ', 'sum_eu_contribution'));
+        ySel.append(new Option('Μ.Ο. % Επενδυτικής Προτεραιότητας', 'average_invest_priority'));
+    }
+}
 
 function updateDashboard() {
     // Refresh chart if already built
@@ -46,6 +97,7 @@ function buildChart() {
 
     const payload = {
         dataset_id: currentDatasetId,
+        dataset_type: currentDatasetType,
         x_dimension: xDim,
         y_metric: yMetric,
         chart_type: type,
@@ -81,17 +133,33 @@ function renderChart(data, type, xDim, yMetric) {
 
     $('#chartTitle').text(title);
 
-    // Color logic
-    let bgColors = colors.accent;
-    if (type === 'pie' || type === 'doughnut' || type === 'radar') {
-        bgColors = colors.palette;
-    } else {
-        bgColors = colors.accent;
-    }
+    // Check if we have multiple datasets (grouped/series)
+    // Current API response structure for PROJECTS is { labels: [], series: [] } (series is array of numbers)
+    // For SUMMARY we might want { labels: [], datasets: [{label:'Group1', data:[]}, ...] }
+    // Let's standardize API response to always be chart.js compatible if possible, or handle both.
 
-    const config = {
-        type: type,
-        data: {
+    let chartData = {};
+
+    // If response has 'datasets' key, it's multi-series (Grouped)
+    if (data.datasets) {
+        // Assign colors
+        data.datasets.forEach((ds, i) => {
+            ds.backgroundColor = colors.palette[i % colors.palette.length];
+            ds.borderColor = colors.bg1;
+        });
+
+        chartData = {
+            labels: data.labels,
+            datasets: data.datasets
+        };
+    } else {
+        // Single series
+        let bgColors = colors.accent;
+        if (type === 'pie' || type === 'doughnut' || type === 'radar') {
+            bgColors = colors.palette;
+        }
+
+        chartData = {
             labels: data.labels,
             datasets: [{
                 label: yLabel,
@@ -99,16 +167,21 @@ function renderChart(data, type, xDim, yMetric) {
                 backgroundColor: bgColors,
                 borderColor: (type === 'line' || type === 'radar') ? colors.accent : colors.bg1,
                 borderWidth: 2,
-                fill: (type === 'radar' || type === 'line' && false),
+                fill: (type === 'radar' || (type === 'line' && false)),
                 tension: 0.3
             }]
-        },
+        };
+    }
+
+    const config = {
+        type: type,
+        data: chartData,
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    display: (type === 'pie' || type === 'doughnut' || type === 'radar'),
+                    display: true, // Always show legend for potential groups
                     position: 'right',
                     labels: { color: colors.text }
                 }
@@ -138,16 +211,42 @@ function renderTable(data) {
         $('#customTable').empty();
     }
 
-    $('#customTable').html('<thead><tr><th>Ετικέτα</th><th>Τιμή</th></tr></thead><tbody></tbody>');
+    // Determine columns
+    let columns = [{ title: "Ετικέτα" }];
+    let rows = [];
 
-    const rows = data.labels.map((lbl, i) => [lbl, data.series[i]]);
+    if (data.datasets) {
+        // Multi-series
+        // Columns: Label, Group1, Group2...
+        data.datasets.forEach(ds => {
+            columns.push({ title: ds.label });
+        });
+
+        // Rows
+        data.labels.forEach((lbl, i) => {
+            let row = [lbl];
+            data.datasets.forEach(ds => {
+                row.push(ds.data[i]);
+            });
+            rows.push(row);
+        });
+
+    } else {
+        // Single series
+        columns.push({ title: "Τιμή" });
+        rows = data.labels.map((lbl, i) => [lbl, data.series[i]]);
+    }
+
+    // Build Header
+    let thead = '<thead><tr>';
+    columns.forEach(c => thead += `<th>${c.title}</th>`);
+    thead += '</tr></thead><tbody></tbody>';
+
+    $('#customTable').html(thead);
 
     dataTable = $('#customTable').DataTable({
         data: rows,
-        columns: [
-            { title: "Ετικέτα" },
-            { title: "Τιμή" }
-        ],
+        columns: columns.map((_, i) => ({ targets: i })), // Just index mapping
         pageLength: 10,
         dom: 'fltip',
         language: datatableGreek
