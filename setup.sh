@@ -87,13 +87,15 @@ if [[ "$DB_CHOICE" == "m" ]]; then
     echo ""
 
     # Create DB and User
+    # We use ALTER USER to ensure password is set correctly even if user exists
     sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
     sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+    sudo mysql -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
     sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
     sudo mysql -e "FLUSH PRIVILEGES;"
 
-    # Update config.php
-    cat > config.php <<EOF
+    # Update config.php using sudo tee to handle permissions
+    sudo tee config.php > /dev/null <<EOF
 <?php
 define('DB_DRIVER', 'mysql');
 define('DB_HOST', 'localhost');
@@ -104,6 +106,9 @@ define('DB_PATH', '');
 define('APP_NAME', 'Horizon Europe / CORDIS Mini BI Dashboard');
 date_default_timezone_set('Europe/Athens');
 EOF
+    # Ensure config.php is readable by web server
+    sudo chown www-data:www-data config.php
+
     echo -e "${GREEN}>>> MySQL configured.${NC}"
 else
     echo -e "${BLUE}>>> Using SQLite (Default)...${NC}"
@@ -210,8 +215,8 @@ sudo -u www-data php $PROJECT_DIR/fix_schema_summary.php
 read -p "Do you want to generate mock data? (y/n) [y]: " GEN_MOCK
 GEN_MOCK=${GEN_MOCK:-y}
 if [[ "$GEN_MOCK" == "y" ]]; then
-    if [ -f "generate_mock_data.php" ]; then
-        sudo -u www-data php generate_mock_data.php
+    if [ -f "$PROJECT_DIR/generate_mock_data.php" ]; then
+        sudo -u www-data php $PROJECT_DIR/generate_mock_data.php
         echo -e "${GREEN}>>> Mock data generated in data/.${NC}"
     fi
 fi
