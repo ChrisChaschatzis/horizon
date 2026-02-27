@@ -88,9 +88,10 @@ if [[ "$DB_CHOICE" == "m" ]]; then
 
     # Create DB and User
     # We use ALTER USER to ensure password is set correctly even if user exists
+    # Use mysql_native_password for compatibility with older PHP/PMA versions
     sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
-    sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
-    sudo mysql -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+    sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}';"
+    sudo mysql -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}';"
     sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
     sudo mysql -e "FLUSH PRIVILEGES;"
 
