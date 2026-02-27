@@ -204,20 +204,22 @@ sudo nginx -t
 sudo systemctl restart nginx
 
 # 10. Generate Mock Data (Optional)
-# (Actually, 'init_db.php' might be creating tables but not populating. Let's keep this choice.)
-# But wait, init_db.php creates schema. Maybe we run migration too just in case?
-# No, init_db usually handles full setup.
-# But for the summary/converter feature, users might need fix_schema_summary.php if init_db doesn't include it yet.
-# To be safe, let's run the schema fix as well.
 echo -e "${BLUE}>>> Applying Summary/Converter Schema...${NC}"
 sudo -u www-data php $PROJECT_DIR/fix_schema_summary.php
 
 read -p "Do you want to generate mock data? (y/n) [y]: " GEN_MOCK
 GEN_MOCK=${GEN_MOCK:-y}
 if [[ "$GEN_MOCK" == "y" ]]; then
+    echo "Generating standard project mock data..."
     if [ -f "$PROJECT_DIR/generate_mock_data.php" ]; then
         sudo -u www-data php $PROJECT_DIR/generate_mock_data.php
-        echo -e "${GREEN}>>> Mock data generated in data/.${NC}"
+        echo -e "${GREEN}>>> Standard mock data generated in data/.${NC}"
+    fi
+
+    echo "Generating comparison mock data (for Converter tool)..."
+    if [ -f "$PROJECT_DIR/generate_mock_comparison_data.php" ]; then
+        sudo -u www-data php $PROJECT_DIR/generate_mock_comparison_data.php
+        echo -e "${GREEN}>>> Comparison mock data generated in data/mock_comparison/.${NC}"
     fi
 fi
 
