@@ -141,6 +141,10 @@ if [ ! -d "$PMA_DIR" ]; then
     sudo cp config.sample.inc.php config.inc.php
     SECRET=$(openssl rand -base64 32 | tr -d '\n\r')
     sudo sed -i "s/\$cfg\['blowfish_secret'\] = '';/\$cfg\['blowfish_secret'\] = '$SECRET';/" config.inc.php
+
+    # Enable AllowNoPassword
+    echo "\$cfg['Servers'][\$i]['AllowNoPassword'] = true;" | sudo tee -a config.inc.php > /dev/null
+
     sudo chown -R www-data:www-data "$PMA_DIR"
     echo -e "${GREEN}>>> phpMyAdmin installed at /pma/ (accessible via browser).${NC}"
 else
