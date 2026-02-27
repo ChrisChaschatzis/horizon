@@ -43,8 +43,6 @@ function fixSchema($pdo) {
 
     // Helper for FK
     $fk = function($col, $refTable) use ($isMysql) {
-        // MySQL requires indexes on FK columns, usually created automatically or requires manual index
-        // SQLite enforces FK if enabled
         if ($isMysql) {
             return "FOREIGN KEY ($col) REFERENCES $refTable(id) ON DELETE CASCADE";
         } else {
@@ -53,9 +51,7 @@ function fixSchema($pdo) {
     };
 
     // 2. Create summary_groups
-    // group_label is indexed, so for MySQL TEXT is bad for indexing key. Use VARCHAR.
     $groupLabelCol = $isMysql ? "VARCHAR(191)" : "TEXT";
-
     $sql = "CREATE TABLE IF NOT EXISTS summary_groups (
         id $pk,
         dataset_id $int NOT NULL,
@@ -67,7 +63,6 @@ function fixSchema($pdo) {
     // Unique Index
     try {
         if ($isMysql) {
-            // Already VARCHAR(191) so no need for prefix length
             $pdo->exec("CREATE UNIQUE INDEX idx_summary_groups_label ON summary_groups(dataset_id, group_label)");
         } else {
             $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_summary_groups_label ON summary_groups(dataset_id, group_label)");
@@ -126,7 +121,7 @@ function fixSchema($pdo) {
         " . $fk('group_id', 'summary_groups') . "
     )";
     $pdo->exec($sql);
-    try { $pdo->exec("CREATE INDEX idx_summ_mission_eu_dataset ON summary_mission_eu_contribution(dataset_id)"); } catch (Exception_e) {}
+    try { $pdo->exec("CREATE INDEX idx_summ_mission_eu_dataset ON summary_mission_eu_contribution(dataset_id)"); } catch (Exception $e) {}
 
     // 7. Create summary_country_net_eu_contribution (Optional)
     $sql = "CREATE TABLE IF NOT EXISTS summary_country_net_eu_contribution (
