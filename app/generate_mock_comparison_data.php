@@ -17,62 +17,100 @@ $entities = [
 
 echo "Generating comparison mock data in $outputDir...\n";
 
+// Holders for Merged Data
+$mergedData = [
+    'pillar_participation' => [['group_label', 'pillar_descr', 'participation']],
+    'programme_participation' => [['group_label', 'framework_programme', 'participation']],
+    'programme_eu_contribution' => [['group_label', 'framework_programme', 'eu_contribution_eur']],
+    'mission_eu_contribution' => [['group_label', 'mission', 'eu_contribution_eur']]
+];
+
 foreach ($entities as $entityName => $multiplier) {
     echo "Processing $entityName...\n";
     $entityDir = $outputDir . '/' . $entityName;
     if (!file_exists($entityDir)) mkdir($entityDir, 0777, true);
 
     // 1. Pillar Participation
-    createExcel(
-        $entityDir . '/pillar_participation.xlsx',
-        ['Pillar Descr', 'Participation'],
-        [
-            ['Excellent Science', (int)(150 * $multiplier)],
-            ['Global Challenges and European Industrial Competitiveness', (int)(300 * $multiplier)],
-            ['Innovative Europe', (int)(80 * $multiplier)],
-            ['Widening Participation and Strengthening the ERA', (int)(20 * $multiplier)]
-        ]
-    );
+    $dataPillar = [
+        ['Excellent Science', (int)(150 * $multiplier)],
+        ['Global Challenges and European Industrial Competitiveness', (int)(300 * $multiplier)],
+        ['Innovative Europe', (int)(80 * $multiplier)],
+        ['Widening Participation and Strengthening the ERA', (int)(20 * $multiplier)]
+    ];
+    createExcel($entityDir . '/pillar_participation.xlsx', ['Pillar Descr', 'Participation'], $dataPillar);
+    // Add to merged
+    foreach($dataPillar as $row) {
+        $mergedData['pillar_participation'][] = [$entityName, $row[0], $row[1]];
+    }
 
     // 2. Programme Participation
-    createExcel(
-        $entityDir . '/programme_participation.xlsx',
-        ['Framework Programme', 'Participation'],
-        [
-            ['Horizon Europe', (int)(450 * $multiplier)],
-            ['Erasmus+', (int)(50 * $multiplier)],
-            ['Euratom', (int)(10 * $multiplier)],
-            ['Digital Europe', (int)(40 * $multiplier)]
-        ]
-    );
+    $dataProgPart = [
+        ['Horizon Europe', (int)(450 * $multiplier)],
+        ['Erasmus+', (int)(50 * $multiplier)],
+        ['Euratom', (int)(10 * $multiplier)],
+        ['Digital Europe', (int)(40 * $multiplier)]
+    ];
+    createExcel($entityDir . '/programme_participation.xlsx', ['Framework Programme', 'Participation'], $dataProgPart);
+    foreach($dataProgPart as $row) {
+        $mergedData['programme_participation'][] = [$entityName, $row[0], $row[1]];
+    }
 
     // 3. Programme EU Contribution
-    createExcel(
-        $entityDir . '/programme_eu_contribution.xlsx',
-        ['Framework Programme', 'EU Contribution (eur)'],
-        [
-            ['Horizon Europe', 15000000 * $multiplier],
-            ['Erasmus+', 2000000 * $multiplier],
-            ['Euratom', 500000 * $multiplier],
-            ['Digital Europe', 3000000 * $multiplier]
-        ]
-    );
+    $dataProgEU = [
+        ['Horizon Europe', 15000000 * $multiplier],
+        ['Erasmus+', 2000000 * $multiplier],
+        ['Euratom', 500000 * $multiplier],
+        ['Digital Europe', 3000000 * $multiplier]
+    ];
+    createExcel($entityDir . '/programme_eu_contribution.xlsx', ['Framework Programme', 'EU Contribution (eur)'], $dataProgEU);
+    foreach($dataProgEU as $row) {
+        $mergedData['programme_eu_contribution'][] = [$entityName, $row[0], $row[1]];
+    }
 
     // 4. Mission EU Contribution
-    createExcel(
-        $entityDir . '/mission_eu_contribution.xlsx',
-        ['Missions', 'EU Contribution (eur)'],
-        [
-            ['Cancer', 2000000 * $multiplier],
-            ['Adaptation to Climate Change', 3500000 * $multiplier],
-            ['Restore our Ocean and Waters', 1500000 * $multiplier],
-            ['Climate-Neutral and Smart Cities', 4000000 * $multiplier],
-            ['A Soil Deal for Europe', 1000000 * $multiplier]
-        ]
-    );
+    $dataMission = [
+        ['Cancer', 2000000 * $multiplier],
+        ['Adaptation to Climate Change', 3500000 * $multiplier],
+        ['Restore our Ocean and Waters', 1500000 * $multiplier],
+        ['Climate-Neutral and Smart Cities', 4000000 * $multiplier],
+        ['A Soil Deal for Europe', 1000000 * $multiplier]
+    ];
+    createExcel($entityDir . '/mission_eu_contribution.xlsx', ['Missions', 'EU Contribution (eur)'], $dataMission);
+    foreach($dataMission as $row) {
+        $mergedData['mission_eu_contribution'][] = [$entityName, $row[0], $row[1]];
+    }
 }
 
-echo "Done! Use these files in the 'Converter' page.\n";
+echo "Generating Final Comparison Pack (Merged)...\n";
+
+$spreadsheet = new Spreadsheet();
+$spreadsheet->removeSheetByIndex(0);
+
+// Meta
+$metaSheet = $spreadsheet->createSheet();
+$metaSheet->setTitle('meta');
+$metaSheet->fromArray([
+    ['key', 'value'],
+    ['created_at', date('Y-m-d H:i:s')],
+    ['version', 'mock_generated_v1'],
+    ['groups_present', implode(', ', array_keys($entities))],
+    ['notes', 'Generated by Mock Data Script']
+]);
+
+// Data Sheets
+foreach($mergedData as $title => $rows) {
+    $sheet = $spreadsheet->createSheet();
+    $sheet->setTitle($title);
+    $sheet->fromArray($rows);
+}
+
+$packFile = $outputDir . '/mock_comparison_pack_final.xlsx';
+$writer = new Xlsx($spreadsheet);
+$writer->save($packFile);
+
+echo "Done! \n";
+echo "1. Individual files in: $outputDir/<Entity>/\n";
+echo "2. Final Pack (Ready to Import): $packFile\n";
 
 function createExcel($filename, $headers, $data) {
     $spreadsheet = new Spreadsheet();
