@@ -14,23 +14,37 @@ function fixSchema($pdo) {
     $int = $isMysql ? "INT" : "INTEGER";
     $real = $isMysql ? "DOUBLE" : "REAL";
 
+    // MySQL cannot have DEFAULT on TEXT/BLOB
+    $datasetTypeCol = $isMysql ? "VARCHAR(50)" : "TEXT";
+
     // 1. Update datasets table
     try {
-        $pdo->exec("ALTER TABLE datasets ADD COLUMN dataset_type $text DEFAULT 'projects'");
+        $pdo->exec("ALTER TABLE datasets ADD COLUMN dataset_type $datasetTypeCol DEFAULT 'projects'");
         echo "Added 'dataset_type' to datasets.\n";
     } catch (PDOException $e) {
-        echo "Column 'dataset_type' already exists or error: " . $e->getMessage() . "\n";
+        // Check if error is 'duplicate column'
+        if (strpos($e->getMessage(), 'duplicate') === false && strpos($e->getMessage(), 'already exists') === false) {
+             echo "Error adding 'dataset_type': " . $e->getMessage() . "\n";
+        } else {
+             echo "Column 'dataset_type' already exists.\n";
+        }
     }
 
     try {
         $pdo->exec("ALTER TABLE datasets ADD COLUMN entities_count $int DEFAULT 0");
         echo "Added 'entities_count' to datasets.\n";
     } catch (PDOException $e) {
-        echo "Column 'entities_count' already exists or error: " . $e->getMessage() . "\n";
+        if (strpos($e->getMessage(), 'duplicate') === false && strpos($e->getMessage(), 'already exists') === false) {
+             echo "Error adding 'entities_count': " . $e->getMessage() . "\n";
+        } else {
+             echo "Column 'entities_count' already exists.\n";
+        }
     }
 
     // Helper for FK
     $fk = function($col, $refTable) use ($isMysql) {
+        // MySQL requires indexes on FK columns, usually created automatically or requires manual index
+        // SQLite enforces FK if enabled
         if ($isMysql) {
             return "FOREIGN KEY ($col) REFERENCES $refTable(id) ON DELETE CASCADE";
         } else {
@@ -39,10 +53,13 @@ function fixSchema($pdo) {
     };
 
     // 2. Create summary_groups
+    // group_label is indexed, so for MySQL TEXT is bad for indexing key. Use VARCHAR.
+    $groupLabelCol = $isMysql ? "VARCHAR(191)" : "TEXT";
+
     $sql = "CREATE TABLE IF NOT EXISTS summary_groups (
         id $pk,
         dataset_id $int NOT NULL,
-        group_label $text NOT NULL,
+        group_label $groupLabelCol NOT NULL,
         " . $fk('dataset_id', 'datasets') . "
     )";
     $pdo->exec($sql);
@@ -50,7 +67,8 @@ function fixSchema($pdo) {
     // Unique Index
     try {
         if ($isMysql) {
-            $pdo->exec("CREATE UNIQUE INDEX idx_summary_groups_label ON summary_groups(dataset_id, group_label(191))");
+            // Already VARCHAR(191) so no need for prefix length
+            $pdo->exec("CREATE UNIQUE INDEX idx_summary_groups_label ON summary_groups(dataset_id, group_label)");
         } else {
             $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_summary_groups_label ON summary_groups(dataset_id, group_label)");
         }
@@ -108,7 +126,7 @@ function fixSchema($pdo) {
         " . $fk('group_id', 'summary_groups') . "
     )";
     $pdo->exec($sql);
-    try { $pdo->exec("CREATE INDEX idx_summ_mission_eu_dataset ON summary_mission_eu_contribution(dataset_id)"); } catch (Exception $e) {}
+    try { $pdo->exec("CREATE INDEX idx_summ_mission_eu_dataset ON summary_mission_eu_contribution(dataset_id)"); } catch (Exception_e) {}
 
     // 7. Create summary_country_net_eu_contribution (Optional)
     $sql = "CREATE TABLE IF NOT EXISTS summary_country_net_eu_contribution (
