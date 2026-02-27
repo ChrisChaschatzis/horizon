@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# setup.sh - Auto-installation script for Horizon Europe BI Dashboard
+# setup.sh - Auto-installation script for Horizon Europe BI Dashboard + phpMyAdmin
 # Tested on Ubuntu 22.04 LTS / Debian 12
 
 set -e
@@ -117,6 +117,30 @@ fi
 echo -e "${BLUE}>>> Initializing Database Schema...${NC}"
 sudo -u www-data php init_db.php
 
+# 8.5. Install phpMyAdmin
+echo -e "${BLUE}>>> Installing phpMyAdmin (pma)...${NC}"
+PMA_DIR="$PROJECT_DIR/pma"
+PMA_VERSION="5.2.1"
+PMA_URL="https://files.phpmyadmin.net/phpMyAdmin/${PMA_VERSION}/phpMyAdmin-${PMA_VERSION}-all-languages.zip"
+
+if [ ! -d "$PMA_DIR" ]; then
+    echo "Downloading phpMyAdmin $PMA_VERSION..."
+    curl -L -o phpmyadmin.zip "$PMA_URL"
+    unzip -q phpmyadmin.zip
+    sudo mv "phpMyAdmin-${PMA_VERSION}-all-languages" "$PMA_DIR"
+    rm phpmyadmin.zip
+
+    # Configure phpMyAdmin
+    cd "$PMA_DIR"
+    sudo cp config.sample.inc.php config.inc.php
+    SECRET=$(openssl rand -base64 32 | tr -d '\n\r')
+    sudo sed -i "s/\$cfg\['blowfish_secret'\] = '';/\$cfg\['blowfish_secret'\] = '$SECRET';/" config.inc.php
+    sudo chown -R www-data:www-data "$PMA_DIR"
+    echo -e "${GREEN}>>> phpMyAdmin installed at /pma/ (accessible via browser).${NC}"
+else
+    echo -e "${GREEN}>>> phpMyAdmin already installed.${NC}"
+fi
+
 # 9. Configure Nginx
 echo -e "${BLUE}>>> Configuring Nginx...${NC}"
 NGINX_CONF="/etc/nginx/sites-available/cordis-bi"
@@ -131,9 +155,22 @@ server {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
+    # Handle phpMyAdmin explicitly if needed (standard PHP block below covers it usually)
+    location ^~ /pma {
+        alias $PROJECT_DIR/pma;
+        index index.php;
+        try_files \$uri \$uri/ /pma/index.php;
+
+        location ~ \.php$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
+            fastcgi_param SCRIPT_FILENAME \$request_filename;
+        }
+    }
+
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')-fpm.sock;
+        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
     }
 
     location ~ /\.ht {
@@ -162,12 +199,23 @@ sudo nginx -t
 sudo systemctl restart nginx
 
 # 10. Generate Mock Data (Optional)
+# (Actually, 'init_db.php' might be creating tables but not populating. Let's keep this choice.)
+# But wait, init_db.php creates schema. Maybe we run migration too just in case?
+# No, init_db usually handles full setup.
+# But for the summary/converter feature, users might need fix_schema_summary.php if init_db doesn't include it yet.
+# To be safe, let's run the schema fix as well.
+echo -e "${BLUE}>>> Applying Summary/Converter Schema...${NC}"
+sudo -u www-data php $PROJECT_DIR/fix_schema_summary.php
+
 read -p "Do you want to generate mock data? (y/n) [y]: " GEN_MOCK
 GEN_MOCK=${GEN_MOCK:-y}
 if [[ "$GEN_MOCK" == "y" ]]; then
-    sudo -u www-data php generate_mock_data.php
-    echo -e "${GREEN}>>> Mock data generated in data/.${NC}"
+    if [ -f "generate_mock_data.php" ]; then
+        sudo -u www-data php generate_mock_data.php
+        echo -e "${GREEN}>>> Mock data generated in data/.${NC}"
+    fi
 fi
 
 echo -e "${GREEN}>>> Installation Complete!${NC}"
 echo -e "${GREEN}>>> Access the dashboard at http://<your-server-ip>/${NC}"
+echo -e "${GREEN}>>> Access phpMyAdmin at http://<your-server-ip>/pma/${NC}"
