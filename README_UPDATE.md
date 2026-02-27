@@ -1,21 +1,23 @@
-# Database Update Instructions
+# Database Update Instructions - IMPORTANT
 
-To update your database schema with the new tables required for the Converter and Comparison Pack features, follow these steps:
+To enable the new Converter and Comparison Pack features, you must update your database schema.
+**Do not run** `fix_mysql_schema.php` or `migrate_db.php` for this update, as they are for older versions.
 
-1.  **Backup your current database.**
-    -   If using SQLite, simply copy `app/database.sqlite` to a safe location.
-    -   If using MySQL, export your database using `mysqldump` or phpMyAdmin.
+## Correct Step
 
-2.  **Run the update script.**
-    -   Navigate to your project root or `app/` directory in your terminal.
-    -   Execute the PHP script:
-        ```bash
-        php app/fix_schema_summary.php
-        ```
-    -   This script will check your existing tables and add the necessary columns (`dataset_type`, `entities_count`) and create the new tables (`summary_groups`, `summary_pillar_participation`, etc.) if they don't exist. It is safe to run multiple times.
+Run the specific summary schema fix script:
 
-3.  **Verify.**
-    -   Access your database (via phpMyAdmin or command line) and check for the existence of tables starting with `summary_`.
+```bash
+php app/fix_schema_summary.php
+```
+
+This script will:
+1.  Add the `dataset_type` column to your `datasets` table (if missing).
+2.  Add the `entities_count` column.
+3.  Create all new tables starting with `summary_` (e.g., `summary_groups`, `summary_pillar_participation`).
+
+## Verification
+After running the command, check your database (e.g., via phpMyAdmin). You should see tables like `summary_groups`.
 
 ---
 
