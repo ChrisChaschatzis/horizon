@@ -36,6 +36,10 @@
                     <i data-lucide="database"></i>
                     <span>Διαχείριση Δεδομένων</span>
                 </a>
+                <a href="converter.php" class="nav-link">
+                    <i data-lucide="file-check-2"></i>
+                    <span>Μετατροπέας / Συγχώνευση</span>
+                </a>
             </nav>
         </aside>
 

@@ -18,11 +18,132 @@ if (!$datasetId) {
     exit;
 }
 
+$datasetType = $input['dataset_type'] ?? 'projects';
 $xDim = $input['x_dimension'] ?? 'coordinator_country';
 $yMetric = $input['y_metric'] ?? 'count';
 $topN = (int)($input['top_n'] ?? 10);
 $filters = $input['filters'] ?? [];
 $filters['dataset_id'] = $datasetId;
+
+// =========================================================
+// SUMMARY DATASET LOGIC
+// =========================================================
+if ($datasetType === 'summary') {
+    // Determine Table
+    $table = "";
+    $colLabel = "";
+    $colValue = "";
+
+    // Map X Dimension to Table/Column
+    switch ($xDim) {
+        case 'pillar_descr':
+            $table = "summary_pillar_participation";
+            $colLabel = "pillar_descr";
+            $colValue = "participation"; // Default unless overridden
+            break;
+        case 'framework_programme':
+             // Could be Participation or EU. Check Y Metric.
+            if ($yMetric === 'sum_eu_contribution') {
+                $table = "summary_programme_eu_contribution";
+                $colValue = "eu_contribution_eur";
+            } else {
+                $table = "summary_programme_participation";
+                $colValue = "participation";
+            }
+            $colLabel = "framework_programme";
+            break;
+        case 'mission':
+            $table = "summary_mission_eu_contribution";
+            $colLabel = "mission";
+            $colValue = "eu_contribution_eur"; // Missions are usually EU contrib in our files
+            break;
+        default:
+            http_response_code(400);
+            echo json_encode(['error' => "Invalid x_dimension for summary: $xDim"]);
+            exit;
+    }
+
+    // Force Y Metric Column (if not already deduced)
+    if ($yMetric === 'sum_eu_contribution' && strpos($table, 'participation') !== false) {
+        // User asked for EU but selected Pillar Participation (which has no EU).
+        // Fail or fallback?
+        // Let's error strictly.
+        http_response_code(400);
+        echo json_encode(['error' => "Metric EU Contribution not available for dimension $xDim"]);
+        exit;
+    }
+
+    // Groups Filter
+    $groupFilter = "";
+    $params = [];
+    if (!empty($filters['groups'])) {
+        $placeholders = implode(',', array_fill(0, count($filters['groups']), '?'));
+        $groupFilter = " AND g.group_label IN ($placeholders)";
+        $params = $filters['groups'];
+    }
+
+    // 1. Get All Labels (Top N)
+    // We aggregate across all selected groups to find Top N overall.
+    $sqlTop = "SELECT t.$colLabel, SUM(t.$colValue) as total
+               FROM $table t
+               JOIN summary_groups g ON t.group_id = g.id
+               WHERE t.dataset_id = ? $groupFilter
+               GROUP BY t.$colLabel
+               ORDER BY total DESC
+               LIMIT $topN";
+
+    $stmtTop = $pdo->prepare($sqlTop);
+    $stmtTop->execute(array_merge([$datasetId], $params));
+    $topLabels = $stmtTop->fetchAll(PDO::FETCH_COLUMN, 0);
+
+    // 2. Get Data Grouped
+    // If no labels found, return empty
+    if (empty($topLabels)) {
+        echo json_encode(['labels' => [], 'datasets' => []]);
+        exit;
+    }
+
+    $inLabels = implode(',', array_fill(0, count($topLabels), '?'));
+
+    $sqlData = "SELECT g.group_label, t.$colLabel, t.$colValue
+                FROM $table t
+                JOIN summary_groups g ON t.group_id = g.id
+                WHERE t.dataset_id = ?
+                AND t.$colLabel IN ($inLabels)
+                $groupFilter";
+
+    $stmtData = $pdo->prepare($sqlData);
+    $stmtData->execute(array_merge([$datasetId], $topLabels, $params));
+    $rows = $stmtData->fetchAll();
+
+    // Organize
+    $map = []; // Group -> Label -> Val
+    foreach ($rows as $r) {
+        $map[$r['group_label']][$r[$colLabel]] = $r[$colValue];
+    }
+
+    $datasets = [];
+    foreach ($map as $groupLabel => $data) {
+        $dataPoint = [];
+        foreach ($topLabels as $lbl) {
+            $dataPoint[] = $data[$lbl] ?? 0;
+        }
+        $datasets[] = [
+            'label' => $groupLabel,
+            'data' => $dataPoint
+        ];
+    }
+
+    echo json_encode([
+        'labels' => $topLabels,
+        'datasets' => $datasets
+    ]);
+    exit;
+}
+
+// =========================================================
+// PROJECTS DATASET LOGIC (Existing)
+// =========================================================
 
 // Build WHERE
 $whereClause = FilterHelper::buildWhereClause($filters, 'p');
@@ -38,23 +159,9 @@ $groupBy = "";
 $orderBy = "y_value DESC";
 $limit = $topN > 0 ? "LIMIT $topN" : "";
 
-// Validate X Dimension
-$allowedX = [
-    'coordinator_country', 'consortium_country',
-    'fields_of_science', 'keyword',
-    'invest_priority',
-    'pillar', 'type_of_action',
-    'year',
-    'has_greek_any_role', 'is_greek_coordinator'
-];
+// ... (Existing Switch Case from previous step) ...
+// Copied and pasted logic for existing behavior:
 
-if (!in_array($xDim, $allowedX)) {
-    http_response_code(400);
-    echo json_encode(['error' => "Invalid x_dimension: $xDim"]);
-    exit;
-}
-
-// Configure X Dimension
 switch ($xDim) {
     case 'coordinator_country':
         $selectX = "p.coordinator_country as x_label";
@@ -111,7 +218,7 @@ switch ($xDim) {
         $groupBy = "x_label";
         $whereSql .= " AND p.signature_date IS NOT NULL";
         $orderBy = "x_label ASC";
-        $limit = ""; // Show all years usually
+        $limit = "";
         break;
 
     case 'has_greek_any_role':
@@ -125,11 +232,8 @@ switch ($xDim) {
         break;
 }
 
-// Configure Y Metric
 switch ($yMetric) {
     case 'count':
-        // If we are joining 1:M tables (like keywords), COUNT(*) counts rows, not projects.
-        // We want project count.
         if ($join) {
             $selectY = "COUNT(DISTINCT p.id) as y_value";
         } else {
@@ -138,9 +242,6 @@ switch ($yMetric) {
         break;
 
     case 'sum_eu_contribution':
-        // If joining, distinct project sum is tricky in SQL directly without subquery or advanced logic.
-        // But usually "Sum of contribution for projects with Keyword X" allows double counting (if project has Keyword X and Y, its budget counts for both).
-        // So SUM(p.eu_contribution) is correct for "Attributed Budget".
         $selectY = "SUM(p.eu_contribution) as y_value";
         break;
 
@@ -148,7 +249,6 @@ switch ($yMetric) {
         if ($xDim === 'invest_priority') {
             $selectY = "AVG(ip.percent) as y_value";
         } else {
-            // Invalid combination, return 0
             $selectY = "0 as y_value";
         }
         break;
@@ -170,15 +270,14 @@ try {
     $stmt->execute($params);
     $data = $stmt->fetchAll();
 
-    // Convert float strings to float
     foreach ($data as &$row) {
         if (isset($row['y_value'])) $row['y_value'] = (float)$row['y_value'];
     }
 
+    // Return Single Series (Legacy Format, compatible with updated JS)
     echo json_encode([
         'labels' => array_column($data, 'x_label'),
-        'series' => array_column($data, 'y_value'),
-        'debug_sql' => $sql // Optional debugging
+        'series' => array_column($data, 'y_value')
     ]);
 
 } catch (PDOException $e) {

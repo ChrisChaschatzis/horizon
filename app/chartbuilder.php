@@ -12,6 +12,27 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .filter-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-chip:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+        }
+        .filter-chip.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+    </style>
 </head>
 <body>
     <div class="layout">
@@ -35,6 +56,10 @@
                 <a href="datasets.php" class="nav-link">
                     <i data-lucide="database"></i>
                     <span>Διαχείριση Δεδομένων</span>
+                </a>
+                <a href="converter.php" class="nav-link">
+                    <i data-lucide="file-check-2"></i>
+                    <span>Μετατροπέας / Συγχώνευση</span>
                 </a>
             </nav>
         </aside>
@@ -67,25 +92,14 @@
                     <div class="form-group">
                         <label class="form-label">Διάσταση X</label>
                         <select id="cbX" class="form-control">
-                            <option value="coordinator_country">Χώρα Συντονιστή</option>
-                            <option value="consortium_country">Χώρα Κοινοπραξίας</option>
-                            <option value="fields_of_science">Επιστημονικό Πεδίο</option>
-                            <option value="keyword">Λέξη-Κλειδί</option>
-                            <option value="invest_priority">Επενδυτική Προτεραιότητα</option>
-                            <option value="pillar">Πρόγραμμα / Pillar</option>
-                            <option value="type_of_action">Τύπος Δράσης</option>
-                            <option value="year">Έτος</option>
-                            <option value="has_greek_any_role">Ελληνικός Ρόλος (Ναι/Όχι)</option>
-                            <option value="is_greek_coordinator">Έλληνας Συντονιστής (Ναι/Όχι)</option>
+                            <!-- Options populate dynamically -->
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Μετρική Y</label>
                         <select id="cbY" class="form-control">
-                            <option value="count">Πλήθος Έργων</option>
-                            <option value="sum_eu_contribution">Σύνολο Συνεισφοράς ΕΕ</option>
-                            <option value="average_invest_priority">Μ.Ο. % Επενδυτικής Προτεραιότητας</option>
+                            <!-- Options populate dynamically -->
                         </select>
                     </div>
 
@@ -103,8 +117,16 @@
 
                  <div class="filters-bar mt-2">
                     <span style="color: var(--muted); margin-right: 0.5rem; font-size: 0.9rem;">Γρήγορα Φίλτρα:</span>
-                    <button class="filter-btn" id="filterGreekAny" onclick="toggleFilter('only_greek_any_role')">🇬🇷 Ελληνική Συμμετοχή</button>
-                    <button class="filter-btn" id="filterGreekCoord" onclick="toggleFilter('only_greek_coordinator')">🇬🇷 Έλληνας Συντονιστής</button>
+
+                    <!-- Project Filters -->
+                    <span class="filter-btn-projects">
+                        <button class="filter-btn" id="filterGreekAny" onclick="toggleFilter('only_greek_any_role')">🇬🇷 Ελληνική Συμμετοχή</button>
+                        <button class="filter-btn" id="filterGreekCoord" onclick="toggleFilter('only_greek_coordinator')">🇬🇷 Έλληνας Συντονιστής</button>
+                    </span>
+
+                    <!-- Group Selector -->
+                    <div id="groupSelectorContainer" style="display:none; align-items:center; gap:0.5rem;"></div>
+
                     <button class="filter-btn" onclick="resetFilters()">
                         <i data-lucide="rotate-ccw" style="width:14px;"></i> Επαναφορά
                     </button>

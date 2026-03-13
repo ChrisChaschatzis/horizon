@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# setup.sh - Auto-installation script for Horizon Europe BI Dashboard
+# setup.sh - Auto-installation script for Horizon Europe BI Dashboard + phpMyAdmin
 # Tested on Ubuntu 22.04 LTS / Debian 12
 
 set -e
@@ -87,13 +87,16 @@ if [[ "$DB_CHOICE" == "m" ]]; then
     echo ""
 
     # Create DB and User
+    # We use ALTER USER to ensure password is set correctly even if user exists
+    # Use mysql_native_password for compatibility with older PHP/PMA versions
     sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
-    sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+    sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}';"
+    sudo mysql -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}';"
     sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
     sudo mysql -e "FLUSH PRIVILEGES;"
 
-    # Update config.php
-    cat > config.php <<EOF
+    # Update config.php using sudo tee to handle permissions
+    sudo tee config.php > /dev/null <<EOF
 <?php
 define('DB_DRIVER', 'mysql');
 define('DB_HOST', 'localhost');
@@ -104,6 +107,9 @@ define('DB_PATH', '');
 define('APP_NAME', 'Horizon Europe / CORDIS Mini BI Dashboard');
 date_default_timezone_set('Europe/Athens');
 EOF
+    # Ensure config.php is readable by web server
+    sudo chown www-data:www-data config.php
+
     echo -e "${GREEN}>>> MySQL configured.${NC}"
 else
     echo -e "${BLUE}>>> Using SQLite (Default)...${NC}"
@@ -116,6 +122,34 @@ fi
 # 8. Initialize Database Tables
 echo -e "${BLUE}>>> Initializing Database Schema...${NC}"
 sudo -u www-data php init_db.php
+
+# 8.5. Install phpMyAdmin
+echo -e "${BLUE}>>> Installing phpMyAdmin (pma)...${NC}"
+PMA_DIR="$PROJECT_DIR/pma"
+PMA_VERSION="5.2.1"
+PMA_URL="https://files.phpmyadmin.net/phpMyAdmin/${PMA_VERSION}/phpMyAdmin-${PMA_VERSION}-all-languages.zip"
+
+if [ ! -d "$PMA_DIR" ]; then
+    echo "Downloading phpMyAdmin $PMA_VERSION..."
+    curl -L -o phpmyadmin.zip "$PMA_URL"
+    unzip -q phpmyadmin.zip
+    sudo mv "phpMyAdmin-${PMA_VERSION}-all-languages" "$PMA_DIR"
+    rm phpmyadmin.zip
+
+    # Configure phpMyAdmin
+    cd "$PMA_DIR"
+    sudo cp config.sample.inc.php config.inc.php
+    SECRET=$(openssl rand -base64 32 | tr -d '\n\r')
+    sudo sed -i "s/\$cfg\['blowfish_secret'\] = '';/\$cfg\['blowfish_secret'\] = '$SECRET';/" config.inc.php
+
+    # Enable AllowNoPassword
+    echo "\$cfg['Servers'][\$i]['AllowNoPassword'] = true;" | sudo tee -a config.inc.php > /dev/null
+
+    sudo chown -R www-data:www-data "$PMA_DIR"
+    echo -e "${GREEN}>>> phpMyAdmin installed at /pma/ (accessible via browser).${NC}"
+else
+    echo -e "${GREEN}>>> phpMyAdmin already installed.${NC}"
+fi
 
 # 9. Configure Nginx
 echo -e "${BLUE}>>> Configuring Nginx...${NC}"
@@ -131,9 +165,22 @@ server {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
+    # Handle phpMyAdmin explicitly if needed (standard PHP block below covers it usually)
+    location ^~ /pma {
+        alias $PROJECT_DIR/pma;
+        index index.php;
+        try_files \$uri \$uri/ /pma/index.php;
+
+        location ~ \.php$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
+            fastcgi_param SCRIPT_FILENAME \$request_filename;
+        }
+    }
+
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')-fpm.sock;
+        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
     }
 
     location ~ /\.ht {
@@ -162,12 +209,25 @@ sudo nginx -t
 sudo systemctl restart nginx
 
 # 10. Generate Mock Data (Optional)
+echo -e "${BLUE}>>> Applying Summary/Converter Schema...${NC}"
+sudo -u www-data php $PROJECT_DIR/fix_schema_summary.php
+
 read -p "Do you want to generate mock data? (y/n) [y]: " GEN_MOCK
 GEN_MOCK=${GEN_MOCK:-y}
 if [[ "$GEN_MOCK" == "y" ]]; then
-    sudo -u www-data php generate_mock_data.php
-    echo -e "${GREEN}>>> Mock data generated in data/.${NC}"
+    echo "Generating standard project mock data..."
+    if [ -f "$PROJECT_DIR/generate_mock_data.php" ]; then
+        sudo -u www-data php $PROJECT_DIR/generate_mock_data.php
+        echo -e "${GREEN}>>> Standard mock data generated in data/.${NC}"
+    fi
+
+    echo "Generating comparison mock data (for Converter tool)..."
+    if [ -f "$PROJECT_DIR/generate_mock_comparison_data.php" ]; then
+        sudo -u www-data php $PROJECT_DIR/generate_mock_comparison_data.php
+        echo -e "${GREEN}>>> Comparison mock data generated in data/mock_comparison/.${NC}"
+    fi
 fi
 
 echo -e "${GREEN}>>> Installation Complete!${NC}"
 echo -e "${GREEN}>>> Access the dashboard at http://<your-server-ip>/${NC}"
+echo -e "${GREEN}>>> Access phpMyAdmin at http://<your-server-ip>/pma/${NC}"
